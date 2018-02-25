@@ -1,0 +1,16 @@
+{
+  "name": "meeting-scheduler-api",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "aws-sdk": "latest",
+    "express": "latest",
+    "body-parser": "latest",
+    "mysql": "latest",
+    "promise": "latest"
+  },
+  "scripts": {
+    "start": "node app.js",
+    "test": "echo \"no tests specified\" && exit 0"
+  }
+}
