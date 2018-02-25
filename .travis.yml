@@ -1,16 +1,18 @@
 language: node_js
 node_js:
-  - "node"
-
+- node
 before_install:
-  - sudo apt-get update
-  - sudo apt-get install python3
-
+- sudo apt-get update
+- sudo apt-get install python3
 before_deploy:
-  - python3 -m pip
-
+- python3 -m pip
 deploy:
-  provider: script
-  script: eb deploy
+  provider: elasticbeanstalk
+  access_key_id: AKIAIX4TGXQIW6BMXOEA
+  secret_access_key:
+    secure: hnLOAqCts4FrRbvWTkOxBXVJBAieRMlDeMb2dgs0evseO1W4yjvY9J/bVVX+jd2fCr3P2h7zKa1x8nmgXZ5nMmkI9hio2UF3GqjkHnOV/w0VbBG/fRlnrxeyCHHPpHXyFCVQBkscDtOmVkNazY5qFypI5G+5A2XhGCRMZl5qGaP1WPDqb6RN7nn72qlx7mU5hhxKLHhbJAdOzLu7RkfMADXj05T2leGvb1pGT3ya/wNS4/XioUvLsQtnyrDeui9VbRGfmN+IIAuslvJPF2qaDwdnfSrm/AEjwfktzm0/957Ei/a5FbrsD5ifE20CIAIOs///vdgSJ2jKZO8HG6NmvL4kVR9uixHoUsrwMTWMdXMyO1jdXr11iAoDbvZB0W3coMNTlpSXFfQVEDCPz8lLp59EtxWlZEQRD9Sm5LH1T5n0HIMlqbpV0sjG8PrYBNeF0jxmjhqvP9pcrJxnBZ6d8TY6ljXiWvnnvu73owCMf3WVeE/2RzS75GhJ5CocrDkDbq0WTFlG45rZ8pxfhKSqreL8urGvMbJv/f33itSxhQYkWDiZK+vQnQXqgd6kVyNrRHJMDyXvjbdc2t+CRx6FyelyPHeRoa88h6EqUuQtguXgmzSZPemZrCbPkB4quqWkXaPAYA+piv6KK/JP6LW+eRBceywtf+hLgVHAJldGGW4=
+  region: us-east-1
+  app: meeting-scheduler
+  env: meeting-scheduler
   on:
     branch: master
