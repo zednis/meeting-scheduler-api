@@ -10,6 +10,7 @@
     "promise": "latest"
   },
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "test": "echo \"no tests specified\" && exit 0"
   }
 }
