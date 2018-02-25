@@ -2,3 +2,15 @@ language: node_js
 node_js:
   - "node"
 
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install python3
+
+before_deploy:
+  - python3 -m pip
+
+deploy:
+  provider: script
+  script: eb deploy
+  on:
+    branch: master
