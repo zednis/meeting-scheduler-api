@@ -10,5 +10,3 @@ deploy:
   app: meeting-scheduler
   env: meeting-scheduler
   bucket_name: "meeting-scheduler-deployment"
-  on:
-    branch: master
