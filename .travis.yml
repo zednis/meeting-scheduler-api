@@ -11,4 +11,4 @@ deploy:
   env: meeting-scheduler
   bucket_name: "meeting-scheduler-deployment"
   on:
-    branch: aws-deployment
+    branch: master
