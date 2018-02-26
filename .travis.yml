@@ -9,5 +9,6 @@ deploy:
   region: us-east-1
   app: meeting-scheduler
   env: meeting-scheduler
+  bucket_name: "meeting-scheduler-deployment"
   on:
     branch: master
