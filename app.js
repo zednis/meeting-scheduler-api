@@ -67,6 +67,7 @@ app.post("/meeting", function (req, res) {
     
 
     console.log(req);
+    console.log(req.body);
 
     var sql = "INSERT INTO ebdb.Meeting (name, startDatetime, endDatetime) VALUES (?, ?, ?);"
     var inserts = [name, startDatetime, endDatetime];
