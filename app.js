@@ -14,7 +14,7 @@ app.set('etag', false);
 
 var port = process.env.PORT || 3000;
 
-sets up a pool of 10 connections to the DB
+//sets up a pool of 10 connections to the DB
 var pool = mysql.createPool({
     connectionLimit : 10,
     host            : process.env.RDS_HOSTNAME,
