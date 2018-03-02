@@ -23,15 +23,6 @@ var pool = mysql.createPool({
     port            : process.env.RDS_PORT
 });
 
-// var pool = mysql.createPool({
-//     connectionLimit : 10,
-//     host: "aa1bp2i9g06gxma.cuqrdbzoxw7e.us-east-1.rds.amazonaws.com",
-//     user: "meetingScheduler",
-//     password: "tacocat42",
-//     port: "3306"
-
-// });
-
 // test the connection to the DB
 var testConnection = new Promise(function(resolve, reject) {
 
@@ -70,24 +61,23 @@ var server = app.listen(port, function () {
 
 //create a meeting
 app.post("/meeting", function (req, res) {
-    var start_datetime = req.query.start_datetime;
-    var end_datetime = req.query.end_datetime;
-    var room_number = req.query.room_number;
+    var name = req.body.name || null;
+    var startDatetime = req.body.startDatetime || null;
+    var endDatetime = req.body.endDatetime || null;
+    
 
     console.log(req);
 
-    var sql = "INSERT INTO ebdb.Meeting (start_datetime, end_datetime, room_number) VALUES (?, ?, ?);"
-    var inserts = [start_datetime, end_datetime, room_number];
+    var sql = "INSERT INTO ebdb.Meeting (name, startDatetime, endDatetime) VALUES (?, ?, ?);"
+    var inserts = [name, startDatetime, endDatetime];
     mysql.format(sql, inserts);
 
     console.log(mysql.format(sql, inserts));
 
-    pool.getConnection(function(err,connection) {
-        connection.query(sql, inserts, function(error, results, fields) {
-            console.log(results);
-            console.log(error);
-            console.log(fields);
-        });
+    pool.query(sql, inserts, function(error, results, fields) {
+        console.log(results);
+        console.log(error);
+        console.log(fields);
     });
 
 });
