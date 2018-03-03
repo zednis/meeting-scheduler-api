@@ -62,23 +62,29 @@ var server = app.listen(port, function () {
 //create a meeting
 app.post("/meeting", function (req, res) {
     var name = req.body.name || null;
-    var startDatetime = req.body.startDatetime || null;
-    var endDatetime = req.body.endDatetime || null;
+    var startDateTime = req.body.startDateTime || null;
+    var endDateTime = req.body.endDateTime || null;
     
 
-    console.log(req);
+    //console.log(req);
     console.log(req.body);
 
-    var sql = "INSERT INTO ebdb.Meeting (name, startDatetime, endDatetime) VALUES (?, ?, ?);"
-    var inserts = [name, startDatetime, endDatetime];
+    var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime) VALUES (?, ?, ?);"
+    var inserts = [name, startDateTime, endDateTime];
     mysql.format(sql, inserts);
 
     console.log(mysql.format(sql, inserts));
 
     pool.query(sql, inserts, function(error, results, fields) {
         console.log(results);
+        console.log(results[0]);
         console.log(error);
         console.log(fields);
+        if(!error) {
+            res.statusCode = 200;
+            res.setHeader("Link", "/meeting/" + results.insertId);
+            res.send();
+        }
     });
 
 });
