@@ -80,7 +80,12 @@ app.post("/meeting", function (req, res) {
         console.log(results[0]);
         console.log(error);
         console.log(fields);
-        if(!error) {
+        if(error) {
+            res.statusCode = 500;
+            console.log(error);
+            res.send("The server encountered an error.");
+        }
+        else {
             res.statusCode = 201;
             res.setHeader("Location", "/meeting/" + results.insertId);
             res.send();
@@ -96,7 +101,12 @@ app.get("/meeting/:meetingId", function (req, res) {
 
     var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
     pool.query(sql, function(error, results, fields) {
-        if(!error) {
+        if(error) {
+            res.statusCode = 500;
+            console.log(error);
+            res.send("The server encountered an error.");
+        }
+        else {
             res.statusCode = 200;
             //console.log(results);
             res.send(results);
@@ -105,13 +115,84 @@ app.get("/meeting/:meetingId", function (req, res) {
     });
 });
 
-// app.put("/meeting/:meetingId", function (req, res) {
-    
-// });
 
-// app.delete("/meeting/:meetingId", function (req, res) {
+//update a meeting
+app.put("/meeting/:meetingId", function (req, res) {
+    var meetingId = req.params.meetingId;
+    var name = req.body.name || null;
+    var startDateTime = req.body.startDateTime || null;
+    var endDateTime = req.body.endDateTime || null;
+
+    var sql = "UPDATE ebdb.Meeting";
+
+    var setAlreadyFlag = false; //becomes true if one of the fields has been set
+
+    if(name) {
+        sql += " SET name = " + pool.escape(name);
+        setAlreadyFlag = true;
+    }
+
+    if(startDateTime) {
+        if(setAlreadyFlag) {
+            sql += ",";
+        }
+        else {
+            sql += " SET";
+        }
+        setAlreadyFlag = true;
+        sql += " startDateTime = " + pool.escape(startDateTime);
+    }
+
+    if(endDateTime) {
+        if(setAlreadyFlag) { 
+            sql += ","; 
+        }
+        else {
+            sql += " SET";
+        }
+        sql += " endDateTime = " + pool.escape(endDateTime);
+    }
+
+    sql += " WHERE id = " + pool.escape(meetingId);
+
+    console.log(sql);
+
+    pool.query(sql, function(error, results, fields) {
+        if(error) {
+            res.statusCode = 500;
+            console.log(error);
+            res.send("The server encountered an error.");
+        }
+        else {
+            res.statusCode = 200;
+            res.send("Meeting updated successfully.");
+        }
+    });
+
+
+});
+
+
+//delete a meeting
+app.delete("/meeting/:meetingId", function (req, res) {
     
-// });
+    var meetingId = req.params.meetingId;
+
+    var sql = "DELETE FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
+    pool.query(sql, function(error, results, fields) {
+        if(error) {
+            res.statusCode = 500;
+            console.log(error);
+            res.send("The server encountered an error.");
+        }
+        else {
+            res.statusCode = 200;
+            res.send("Meeting deleted successfully.");
+        }
+    });
+
+
+});
 
 function cleanup() {
     console.log("shutting down");
