@@ -81,17 +81,29 @@ app.post("/meeting", function (req, res) {
         console.log(error);
         console.log(fields);
         if(!error) {
-            res.statusCode = 200;
-            res.setHeader("Link", "/meeting/" + results.insertId);
+            res.statusCode = 201;
+            res.setHeader("Location", "/meeting/" + results.insertId);
             res.send();
         }
     });
 
 });
 
-// app.get("/meeting/:meetingId", function (req, res) {
-    
-// });
+
+//retrieving a meeting
+app.get("/meeting/:meetingId", function (req, res) {
+    var meetingId = req.params.meetingId;
+
+    var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
+    pool.query(sql, function(error, results, fields) {
+        if(!error) {
+            res.statusCode = 200;
+            //console.log(results);
+            res.send(results);
+        }
+
+    });
+});
 
 // app.put("/meeting/:meetingId", function (req, res) {
     
