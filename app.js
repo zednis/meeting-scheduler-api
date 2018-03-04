@@ -76,19 +76,31 @@ app.post("/meeting", function (req, res) {
     console.log(mysql.format(sql, inserts));
 
     pool.query(sql, inserts, function(error, results, fields) {
-        console.log(results);
-        console.log(results[0]);
-        console.log(error);
-        console.log(fields);
+        // console.log(results);
+        // console.log(results[0]);
+        // console.log(error);
+        // console.log(fields);
         if(error) {
             res.statusCode = 500;
             console.log(error);
-            res.send("The server encountered an error.");
+            res.json({
+              "requestURL":  "/meeting",
+              "action": "post",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
         }
         else {
             res.statusCode = 201;
             res.setHeader("Location", "/meeting/" + results.insertId);
-            res.send();
+            res.json({
+              "requestURL":  "/meeting",
+              "action": "post",
+              "status": 201,
+              "message": "Meeting created successfully",
+              "timestamp": new Date()
+            });
         }
     });
 
@@ -101,15 +113,44 @@ app.get("/meeting/:meetingId", function (req, res) {
 
     var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
     pool.query(sql, function(error, results, fields) {
+        console.log(results);
         if(error) {
+            console.warn("Query failed");
             res.statusCode = 500;
-            console.log(error);
-            res.send("The server encountered an error.");
+            res.json({
+              "requestURL":  "/meeting/" + meetingId,
+              "action": "get",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
         }
         else {
-            res.statusCode = 200;
-            //console.log(results);
-            res.send(results);
+            if(results.length == 1) {
+              res.statusCode = 200;
+              //console.log(results[0]);
+              res.send(results[0]);
+            } else if (results.length == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "get",
+                "status": 404,
+                "message": "Meeting not found",
+                "timestamp": new Date()
+              });
+            } else {
+              // this should never happen since we are selecting on the primary key
+              console.warn("Multiple meetings returned with meetingId: "+ meetingId);
+              res.statusCode = 500;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "get",
+                "status": 500,
+                "message": "Multiple meetings found",
+                "timestamp": new Date()
+              });
+            }
         }
 
     });
@@ -127,45 +168,60 @@ app.put("/meeting/:meetingId", function (req, res) {
 
     var setAlreadyFlag = false; //becomes true if one of the fields has been set
 
-    if(name) {
-        sql += " SET name = " + pool.escape(name);
-        setAlreadyFlag = true;
-    }
+    var sqlInserts = {
+        name: name, 
+        startDateTime: startDateTime, 
+        endDateTime: endDateTime
+    };
 
-    if(startDateTime) {
-        if(setAlreadyFlag) {
-            sql += ",";
-        }
-        else {
-            sql += " SET";
-        }
-        setAlreadyFlag = true;
-        sql += " startDateTime = " + pool.escape(startDateTime);
-    }
+    //console.log(sqlInserts)
 
-    if(endDateTime) {
-        if(setAlreadyFlag) { 
-            sql += ","; 
+    for(var x in sqlInserts) {
+        if(sqlInserts[x]) {
+            sql += (setAlreadyFlag) ? ", " : " SET ";
+            setAlreadyFlag = true;
+            sql += " " + x + " = " + pool.escape(sqlInserts[x]);
         }
-        else {
-            sql += " SET";
-        }
-        sql += " endDateTime = " + pool.escape(endDateTime);
     }
 
     sql += " WHERE id = " + pool.escape(meetingId);
 
-    console.log(sql);
+    //console.log(sql);
 
     pool.query(sql, function(error, results, fields) {
+        //console.log("Results: \n");
+        //console.log(results);
         if(error) {
+            console.warn("Query failed");
             res.statusCode = 500;
-            console.log(error);
-            res.send("The server encountered an error.");
+            res.json({
+              "requestURL":  "/meeting/" + meetingId,
+              "action": "put",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
         }
         else {
-            res.statusCode = 200;
-            res.send("Meeting updated successfully.");
+            if(results.affectedRows != 0) {
+              res.statusCode = 200;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "put",
+                "status": 200,
+                "message": "Meeting updated successfully",
+                "timestamp": new Date()
+              });
+            } else { //if (results.affectedRows == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "put",
+                "status": 404,
+                "message": "Meeting not found",
+                "timestamp": new Date()
+              });
+          }
         }
     });
 
@@ -181,13 +237,36 @@ app.delete("/meeting/:meetingId", function (req, res) {
     var sql = "DELETE FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
     pool.query(sql, function(error, results, fields) {
         if(error) {
+            console.warn("Query failed");
             res.statusCode = 500;
-            console.log(error);
-            res.send("The server encountered an error.");
+            res.json({
+              "requestURL":  "/meeting/" + meetingId,
+              "action": "delete",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
         }
         else {
-            res.statusCode = 200;
-            res.send("Meeting deleted successfully.");
+            if(results.affectedRows != 0) {
+              res.statusCode = 200;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "delete",
+                "status": 200,
+                "message": "Meeting deleted successfully",
+                "timestamp": new Date()
+              });
+            } else { //if (results.affectedRows == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "delete",
+                "status": 404,
+                "message": "Meeting not found",
+                "timestamp": new Date()
+              });
+          }
         }
     });
 
