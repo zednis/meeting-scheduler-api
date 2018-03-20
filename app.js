@@ -69,7 +69,7 @@ app.post("/meeting", function (req, res) {
     //console.log(req);
     console.log(req.body);
 
-    var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime) VALUES (?, ?, ?);"
+    var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime) VALUES (?, ?, ?);";
     var inserts = [name, startDateTime, endDateTime];
     mysql.format(sql, inserts);
 
@@ -269,9 +269,255 @@ app.delete("/meeting/:meetingId", function (req, res) {
           }
         }
     });
+});
+
+
+//initial user endpoints
+
+
+//create a user
+app.post("/user", function (req, res) {
+    var email = req.body.email || null;
+    var givenName = req.body.givenName || null;
+    var familyName = req.body.familyName || null;
+    
+
+    //console.log(req);
+    console.log(req.body);
+
+    var sql = "INSERT INTO ebdb.User (email, given_name, family_name) VALUES (?, ?, ?);";
+
+    //primary_calendar_fk remains null. would have to do an additional nested query to update it.
+
+    var inserts = [email, givenName, familyName];
+    mysql.format(sql, inserts);
+
+    console.log(mysql.format(sql, inserts));
+
+    //create user w given params
+    pool.query(sql, inserts, function(error, results, fields) {
+        // console.log(results);
+        // console.log(results[0]);
+        // console.log(error);
+        // console.log(fields);
+        if(error) {
+            res.statusCode = 500;
+            console.log(error);
+            res.json({
+              "requestURL":  "/user",
+              "action": "post",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
+        }
+        else {
+            var calendarName = givenName + "'s Primary Calendar";
+            var userFk = results.insertId;
+            var calendarSql = "INSERT INTO ebdb.Calendar (name, user_fk) VALUES (?, ?);";
+            var calendarInserts = [calendarName, userFk];
+
+
+            //create calendar for the user
+            pool.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
+              if(error1) {
+                  res.statusCode = 500;
+                  console.log(error1);
+                  res.json({
+                    "requestURL":  "/user",
+                    "action": "post",
+                    "status": 500,
+                    "message": "Query failed",
+                    "timestamp": new Date()
+                  });
+              }
+              else {
+                res.statusCode = 201;
+                res.setHeader("Location", "/user/" + userFk);
+                res.json({
+                  "requestURL":  "/user",
+                  "action": "post",
+                  "status": 201,
+                  "message": "User created successfully",
+                  "timestamp": new Date()
+                });
+              }
+            });
+        }
+    });
+
+});
+
+
+//retrieving a user
+app.get("/meeting/:meetingId", function (req, res) {
+    var meetingId = req.params.meetingId;
+
+    var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
+    pool.query(sql, function(error, results, fields) {
+        console.log(results);
+        if(error) {
+            console.warn("Query failed");
+            res.statusCode = 500;
+            res.json({
+              "requestURL":  "/meeting/" + meetingId,
+              "action": "get",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
+        }
+        else {
+            if(results.length == 1) {
+              res.statusCode = 200;
+              //console.log(results[0]);
+              res.send(results[0]);
+            } else if (results.length == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "get",
+                "status": 404,
+                "message": "Meeting not found",
+                "timestamp": new Date()
+              });
+            } else {
+              // this should never happen since we are selecting on the primary key
+              console.warn("Multiple meetings returned with meetingId: "+ meetingId);
+              res.statusCode = 500;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "get",
+                "status": 500,
+                "message": "Multiple meetings found",
+                "timestamp": new Date()
+              });
+            }
+        }
+
+    });
+});
+
+
+//update a user
+app.put("/meeting/:meetingId", function (req, res) {
+    var meetingId = req.params.meetingId;
+    var name = req.body.name || null;
+    var startDateTime = req.body.startDateTime || null;
+    var endDateTime = req.body.endDateTime || null;
+
+    var sql = "UPDATE ebdb.Meeting";
+
+    var setAlreadyFlag = false; //becomes true if one of the fields has been set
+
+    var sqlInserts = {
+        name: name, 
+        startDateTime: startDateTime, 
+        endDateTime: endDateTime
+    };
+
+    //console.log(sqlInserts)
+
+    for(var x in sqlInserts) {
+        if(sqlInserts[x]) {
+            sql += (setAlreadyFlag) ? ", " : " SET ";
+            setAlreadyFlag = true;
+            sql += " " + x + " = " + pool.escape(sqlInserts[x]);
+        }
+    }
+
+    sql += " WHERE id = " + pool.escape(meetingId);
+
+    //console.log(sql);
+
+    pool.query(sql, function(error, results, fields) {
+        //console.log("Results: \n");
+        //console.log(results);
+        if(error) {
+            console.warn("Query failed");
+            res.statusCode = 500;
+            res.json({
+              "requestURL":  "/meeting/" + meetingId,
+              "action": "put",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
+        }
+        else {
+            if(results.affectedRows != 0) {
+              res.statusCode = 200;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "put",
+                "status": 200,
+                "message": "Meeting updated successfully",
+                "timestamp": new Date()
+              });
+            } else { //if (results.affectedRows == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "put",
+                "status": 404,
+                "message": "Meeting not found",
+                "timestamp": new Date()
+              });
+          }
+        }
+    });
 
 
 });
+
+
+//delete a user
+app.delete("/meeting/:meetingId", function (req, res) {
+    
+    var meetingId = req.params.meetingId;
+
+    var sql = "DELETE FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
+    pool.query(sql, function(error, results, fields) {
+        if(error) {
+            console.warn("Query failed");
+            res.statusCode = 500;
+            res.json({
+              "requestURL":  "/meeting/" + meetingId,
+              "action": "delete",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
+        }
+        else {
+            if(results.affectedRows != 0) {
+              res.statusCode = 200;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "delete",
+                "status": 200,
+                "message": "Meeting deleted successfully",
+                "timestamp": new Date()
+              });
+            } else { //if (results.affectedRows == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/meeting/" + meetingId,
+                "action": "delete",
+                "status": 404,
+                "message": "Meeting not found",
+                "timestamp": new Date()
+              });
+          }
+        }
+    });
+});
+
+
+
+
+
+
 
 function cleanup() {
     console.log("shutting down");
