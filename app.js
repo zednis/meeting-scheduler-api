@@ -350,17 +350,17 @@ app.post("/user", function (req, res) {
 
 
 //retrieving a user
-app.get("/meeting/:meetingId", function (req, res) {
-    var meetingId = req.params.meetingId;
+app.get("/user/:userId", function (req, res) {
+    var userId = req.params.userId;
 
-    var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
+    var sql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
     pool.query(sql, function(error, results, fields) {
         console.log(results);
         if(error) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/meeting/" + meetingId,
+              "requestURL":  "/user/" + userId,
               "action": "get",
               "status": 500,
               "message": "Query failed",
@@ -375,21 +375,21 @@ app.get("/meeting/:meetingId", function (req, res) {
             } else if (results.length == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/meeting/" + meetingId,
+                "requestURL":  "/user/" + userId,
                 "action": "get",
                 "status": 404,
-                "message": "Meeting not found",
+                "message": "User not found",
                 "timestamp": new Date()
               });
             } else {
               // this should never happen since we are selecting on the primary key
-              console.warn("Multiple meetings returned with meetingId: "+ meetingId);
+              console.warn("Multiple Users returned with userId: "+ userId);
               res.statusCode = 500;
               res.json({
-                "requestURL":  "/meeting/" + meetingId,
+                "requestURL":  "/user/" + userId,
                 "action": "get",
                 "status": 500,
-                "message": "Multiple meetings found",
+                "message": "Multiple users found",
                 "timestamp": new Date()
               });
             }
