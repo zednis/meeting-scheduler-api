@@ -400,20 +400,20 @@ app.get("/user/:userId", function (req, res) {
 
 
 //update a user
-app.put("/meeting/:meetingId", function (req, res) {
-    var meetingId = req.params.meetingId;
-    var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
+app.put("/user/:userId", function (req, res) {
+    var userId = req.params.userId;
+    var email = req.body.email || null;
+    var givenName = req.body.givenName || null;
+    var familyName = req.body.familyName || null;
 
-    var sql = "UPDATE ebdb.Meeting";
+    var sql = "UPDATE ebdb.User";
 
     var setAlreadyFlag = false; //becomes true if one of the fields has been set
 
     var sqlInserts = {
-        name: name, 
-        startDateTime: startDateTime, 
-        endDateTime: endDateTime
+        email: email, 
+        given_name: givenName, 
+        family_name: familyName
     };
 
     //console.log(sqlInserts)
@@ -426,9 +426,9 @@ app.put("/meeting/:meetingId", function (req, res) {
         }
     }
 
-    sql += " WHERE id = " + pool.escape(meetingId);
+    sql += " WHERE id = " + pool.escape(userId);
 
-    //console.log(sql);
+    console.log(sql);
 
     pool.query(sql, function(error, results, fields) {
         //console.log("Results: \n");
@@ -437,7 +437,7 @@ app.put("/meeting/:meetingId", function (req, res) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/meeting/" + meetingId,
+              "requestURL":  "/user/" + userId,
               "action": "put",
               "status": 500,
               "message": "Query failed",
@@ -448,19 +448,19 @@ app.put("/meeting/:meetingId", function (req, res) {
             if(results.affectedRows != 0) {
               res.statusCode = 200;
               res.json({
-                "requestURL":  "/meeting/" + meetingId,
+                "requestURL":  "/user/" + userId,
                 "action": "put",
                 "status": 200,
-                "message": "Meeting updated successfully",
+                "message": "User updated successfully",
                 "timestamp": new Date()
               });
             } else { //if (results.affectedRows == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/meeting/" + meetingId,
+                "requestURL":  "/user/" + userId,
                 "action": "put",
                 "status": 404,
-                "message": "Meeting not found",
+                "message": "User not found",
                 "timestamp": new Date()
               });
           }
