@@ -472,40 +472,72 @@ app.put("/meeting/:meetingId", function (req, res) {
 
 
 //delete a user
-app.delete("/meeting/:meetingId", function (req, res) {
+app.delete("/user/:userId", function (req, res) {
     
-    var meetingId = req.params.meetingId;
+    var userId = req.params.userId;
 
-    var sql = "DELETE FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
-    pool.query(sql, function(error, results, fields) {
+    var calendarSql = "DELETE FROM ebdb.Calendar WHERE user_fk = " + pool.escape(userId);
+    
+    //delete calendar then user
+
+    pool.query(calendarSql, function(error, results, fields) {
         if(error) {
-            console.warn("Query failed");
+            console.warn("Calendar query failed");
+            console.log(error);
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/meeting/" + meetingId,
+              "requestURL":  "/user/" + userId,
               "action": "delete",
               "status": 500,
-              "message": "Query failed",
+              "message": "Query failed for calendar",
               "timestamp": new Date()
             });
         }
         else {
             if(results.affectedRows != 0) {
-              res.statusCode = 200;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "delete",
-                "status": 200,
-                "message": "Meeting deleted successfully",
-                "timestamp": new Date()
+              var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
+              pool.query(sql, function(error1, results1, fields1) {
+                  if(error1) {
+                      console.warn("User query failed");
+                      console.log(error);
+                      res.statusCode = 500;
+                      res.json({
+                        "requestURL":  "/user/" + userId,
+                        "action": "delete",
+                        "status": 500,
+                        "message": "Query failed",
+                        "timestamp": new Date()
+                      });
+                  }
+                  else {
+                      if(results1.affectedRows != 0) {
+                        res.statusCode = 200;
+                        res.json({
+                          "requestURL":  "/user/" + userId,
+                          "action": "delete",
+                          "status": 200,
+                          "message": "User and their calendar deleted successfully",
+                          "timestamp": new Date()
+                        });
+                      } else { //if (results.affectedRows == 0) {
+                        res.statusCode = 404;
+                        res.json({
+                          "requestURL":  "/user/" + userId,
+                          "action": "delete",
+                          "status": 404,
+                          "message": "User not found",
+                          "timestamp": new Date()
+                        });
+                    }
+                  }
               });
             } else { //if (results.affectedRows == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/meeting/" + meetingId,
+                "requestURL":  "/user/" + userId,
                 "action": "delete",
                 "status": 404,
-                "message": "Meeting not found",
+                "message": "Calendar not found for user " + userId,
                 "timestamp": new Date()
               });
           }
