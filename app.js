@@ -277,6 +277,19 @@ app.delete("/meeting/:meetingId", function (req, res) {
 
 //create a user
 app.post("/user", function (req, res) {
+
+    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+      res.statusCode = 400;
+      console.log();
+      res.json({
+        "requestURL":  "/user",
+        "action": "post",
+        "status": 400,
+        "message": "Bad Request",
+        "timestamp": new Date()
+      });
+    }
+
     var email = req.body.email || null;
     var givenName = req.body.givenName || null;
     var familyName = req.body.familyName || null;
@@ -402,6 +415,19 @@ app.get("/user/:userId", function (req, res) {
 //update a user
 app.put("/user/:userId", function (req, res) {
     var userId = req.params.userId;
+    
+    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+      res.statusCode = 400;
+      console.log();
+      res.json({
+        "requestURL":  "/user",
+        "action": "post",
+        "status": 400,
+        "message": "Bad Request",
+        "timestamp": new Date()
+      });
+    }
+
     var email = req.body.email || null;
     var givenName = req.body.givenName || null;
     var familyName = req.body.familyName || null;
