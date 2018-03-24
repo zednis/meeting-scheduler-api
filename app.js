@@ -597,13 +597,13 @@ app.delete("/user/:userId", function (req, res) {
 // meeting room endpoints
 
 //create a meeting room
-app.post("/user", function (req, res) {
+app.post("/meetingRoom", function (req, res) {
 
     if(!req.body.name) {
       res.statusCode = 400;
       console.log();
       res.json({
-        "requestURL":  "/user",
+        "requestURL":  "/meetingRoom",
         "action": "post",
         "status": 400,
         "message": "Bad Request",
@@ -613,47 +613,43 @@ app.post("/user", function (req, res) {
 
     var name = req.body.name || null;
 
-    //console.log(req);
-    console.log(req.body);
-
-    var sql = "INSERT INTO ebdb.MeetingRoom (name) VALUES (?);";
-
-    var inserts = [name];
-    mysql.format(sql, inserts);
-
-    console.log(mysql.format(sql, inserts));
-
-    //create user w given params
-    pool.query(sql, inserts, function(error, results, fields) {
-        // console.log(results);
-        // console.log(results[0]);
-        // console.log(error);
-        // console.log(fields);
-        if(error) {
-            res.statusCode = 500;
-            console.log(error);
-            res.json({
-              "requestURL":  "/user",
-              "action": "post",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            var calendarName = givenName + "'s Meeting Room Calendar";
-            var userFk = results.insertId;
-            var calendarSql = "INSERT INTO ebdb.Calendar (name, user_fk) VALUES (?, ?);";
-            var calendarInserts = [calendarName, userFk];
+    var calendarName = name + "'s Meeting Room Calendar";
+    var calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
+    var calendarInserts = [calendarName];
 
 
-            //create calendar for the user
-            pool.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
+    //create calendar for the meeting room
+    pool.query(calendarSql, calendarInserts, function(error, results, fields) {
+      if(error) {
+          res.statusCode = 500;
+          console.log(error);
+          res.json({
+            "requestURL":  "/meetingRoom",
+            "action": "post",
+            "status": 500,
+            "message": "Query failed for calendar",
+            "timestamp": new Date()
+          });
+      }
+      else {
+        
+          var sql = "INSERT INTO ebdb.MeetingRoom (name, calendar_fk) VALUES (?, ?);";
+
+          var inserts = [name, results.insertId];
+          mysql.format(sql, inserts);
+
+          console.log(mysql.format(sql, inserts));
+
+          pool.query(sql, inserts, function(error1, results1, fields1) {
+              // console.log(results);
+              // console.log(results[0]);
+              // console.log(error);
+              // console.log(fields);
               if(error1) {
                   res.statusCode = 500;
                   console.log(error1);
                   res.json({
-                    "requestURL":  "/user",
+                    "requestURL":  "/meetingRoom",
                     "action": "post",
                     "status": 500,
                     "message": "Query failed",
@@ -661,35 +657,36 @@ app.post("/user", function (req, res) {
                   });
               }
               else {
-                res.statusCode = 201;
-                res.setHeader("Location", "/user/" + userFk);
-                res.json({
-                  "requestURL":  "/user",
-                  "action": "post",
-                  "status": 201,
-                  "message": "User created successfully",
-                  "timestamp": new Date()
-                });
+                  res.statusCode = 201;
+                  res.setHeader("Location", "/meetingRoom/" + results1.insertId);
+                  res.json({
+                    "requestURL":  "/meetingRoom",
+                    "action": "post",
+                    "status": 201,
+                    "message": "Meeting Room created successfully",
+                    "timestamp": new Date()
+                  });
               }
-            });
-        }
+          });
+      }
     });
+
 
 });
 
 
-//retrieving a user
-app.get("/user/:userId", function (req, res) {
-    var userId = req.params.userId;
+//retrieving a meeting room
+app.get("/meetingRoom/:meetingRoomId", function (req, res) {
+    var meetingRoomId = req.params.meetingRoomId;
 
-    var sql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
+    var sql = "SELECT * FROM ebdb.MeetingRoom WHERE id = " + pool.escape(meetingRoomId);
     pool.query(sql, function(error, results, fields) {
         console.log(results);
         if(error) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/user/" + userId,
+              "requestURL":  "/meetingRoom/" + meetingRoomId,
               "action": "get",
               "status": 500,
               "message": "Query failed",
@@ -704,21 +701,21 @@ app.get("/user/:userId", function (req, res) {
             } else if (results.length == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/user/" + userId,
+                "requestURL":  "/meetingRoom/" + meetingRoomId,
                 "action": "get",
                 "status": 404,
-                "message": "User not found",
+                "message": "Meeting room not found",
                 "timestamp": new Date()
               });
             } else {
               // this should never happen since we are selecting on the primary key
-              console.warn("Multiple Users returned with userId: "+ userId);
+              console.warn("Multiple Meeting Rooms returned with meetingRoomId: "+ meetingRoomId);
               res.statusCode = 500;
               res.json({
-                "requestURL":  "/user/" + userId,
+                "requestURL":  "/meetingRoom/" + meetingRoomId,
                 "action": "get",
                 "status": 500,
-                "message": "Multiple users found",
+                "message": "Multiple meeting rooms found",
                 "timestamp": new Date()
               });
             }
@@ -728,15 +725,15 @@ app.get("/user/:userId", function (req, res) {
 });
 
 
-//update a user
-app.put("/user/:userId", function (req, res) {
-    var userId = req.params.userId;
+//update a meeting room
+app.put("/meetingRoom/:meetingRoomId", function (req, res) {
+    var meetingRoomId = req.params.meetingRoomId;
 
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+    if(!req.body.name) {
       res.statusCode = 400;
       console.log();
       res.json({
-        "requestURL":  "/user",
+        "requestURL":  "/meetingRoom",
         "action": "post",
         "status": 400,
         "message": "Bad Request",
@@ -744,31 +741,11 @@ app.put("/user/:userId", function (req, res) {
       });
     }
 
-    var email = req.body.email || null;
-    var givenName = req.body.givenName || null;
-    var familyName = req.body.familyName || null;
+    var name = req.body.name || null;
 
-    var sql = "UPDATE ebdb.User";
+    var sql = "UPDATE ebdb.MeetingRoom SET name = " + pool.escape(name);
 
-    var setAlreadyFlag = false; //becomes true if one of the fields has been set
-
-    var sqlInserts = {
-        email: email, 
-        given_name: givenName, 
-        family_name: familyName
-    };
-
-    //console.log(sqlInserts)
-
-    for(var x in sqlInserts) {
-        if(sqlInserts[x]) {
-            sql += (setAlreadyFlag) ? ", " : " SET ";
-            setAlreadyFlag = true;
-            sql += " " + x + " = " + pool.escape(sqlInserts[x]);
-        }
-    }
-
-    sql += " WHERE id = " + pool.escape(userId);
+    sql += " WHERE id = " + pool.escape(meetingRoomId);
 
     console.log(sql);
 
@@ -779,7 +756,7 @@ app.put("/user/:userId", function (req, res) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/user/" + userId,
+              "requestURL":  "/meetingRoom/" + meetingRoomId,
               "action": "put",
               "status": 500,
               "message": "Query failed",
@@ -790,19 +767,19 @@ app.put("/user/:userId", function (req, res) {
             if(results.affectedRows != 0) {
               res.statusCode = 200;
               res.json({
-                "requestURL":  "/user/" + userId,
+                "requestURL":  "/meetingRoom/" + meetingRoomId,
                 "action": "put",
                 "status": 200,
-                "message": "User updated successfully",
+                "message": "Meeting Room updated successfully",
                 "timestamp": new Date()
               });
             } else { //if (results.affectedRows == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/user/" + userId,
+                "requestURL":  "/meetingRoom/" + meetingRoomId,
                 "action": "put",
                 "status": 404,
-                "message": "User not found",
+                "message": "Meeting Room not found",
                 "timestamp": new Date()
               });
           }
@@ -813,77 +790,100 @@ app.put("/user/:userId", function (req, res) {
 });
 
 
-//delete a user
-app.delete("/user/:userId", function (req, res) {
+//delete a meeting room
+app.delete("/meetingRoom/:meetingRoomId", function (req, res) {
     
-    var userId = req.params.userId;
+    var meetingRoomId = req.params.meetingRoomId;
 
-    var calendarSql = "DELETE FROM ebdb.Calendar WHERE user_fk = " + pool.escape(userId);
-    
-    //delete calendar then user
+    var calendarFkSql = "SELECT * FROM ebdb.MeetingRoom WHERE id = " + pool.escape(meetingRoomId);
 
-    pool.query(calendarSql, function(error, results, fields) {
-        if(error) {
-            console.warn("Calendar query failed");
-            console.log(error);
-            res.statusCode = 500;
-            res.json({
-              "requestURL":  "/user/" + userId,
-              "action": "delete",
-              "status": 500,
-              "message": "Query failed for calendar",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            if(results.affectedRows != 0) {
-              var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
-              pool.query(sql, function(error1, results1, fields1) {
-                  if(error1) {
-                      console.warn("User query failed");
-                      console.log(error);
-                      res.statusCode = 500;
-                      res.json({
-                        "requestURL":  "/user/" + userId,
-                        "action": "delete",
-                        "status": 500,
-                        "message": "Query failed",
-                        "timestamp": new Date()
-                      });
-                  }
-                  else {
-                      if(results1.affectedRows != 0) {
-                        res.statusCode = 200;
-                        res.json({
-                          "requestURL":  "/user/" + userId,
-                          "action": "delete",
-                          "status": 200,
-                          "message": "User and their calendar deleted successfully",
-                          "timestamp": new Date()
-                        });
-                      } else { //if (results.affectedRows == 0) {
-                        res.statusCode = 404;
-                        res.json({
-                          "requestURL":  "/user/" + userId,
-                          "action": "delete",
-                          "status": 404,
-                          "message": "User not found",
-                          "timestamp": new Date()
-                        });
-                    }
-                  }
-              });
-            } else { //if (results.affectedRows == 0) {
-              res.statusCode = 404;
+    pool.query(calendarFkSql, function(error, results, fields) {
+      if(error) {
+          console.warn("Query failed");
+          console.log(error);
+          res.statusCode = 500;
+          res.json({
+            "requestURL":  "/meetingRoom/" + meetingRoomId,
+            "action": "delete",
+            "status": 500,
+            "message": "Query failed",
+            "timestamp": new Date()
+          });
+      }
+      else {
+        console.log("Results: " + results[0]);
+        var calendarId = results[0].calendar_fk;
+        console.log("ID: " + calendarId);
+
+        var sql = "DELETE FROM ebdb.MeetingRoom WHERE id = " + pool.escape(meetingRoomId);
+      
+      //delete Meeting Room then Calendar
+
+      pool.query(sql, function(error1, results1, fields) {
+          if(error1) {
+              console.warn("Meeting Room query failed");
+              console.log(error);
+              res.statusCode = 500;
               res.json({
-                "requestURL":  "/user/" + userId,
+                "requestURL":  "/meetingRoom/" + meetingRoomId,
                 "action": "delete",
-                "status": 404,
-                "message": "Calendar not found for user " + userId,
+                "status": 500,
+                "message": "Query failed for meeting room",
                 "timestamp": new Date()
               });
           }
-        }
+          else {
+              if(results1.affectedRows != 0) {
+                 var calendarSql = "DELETE FROM ebdb.Calendar WHERE id = " + pool.escape(calendarId);
+                
+                pool.query(calendarSql, function(error2, results2, fields2) {
+                    if(error2) {
+                        console.warn("Calendar query failed");
+                        console.log(error2);
+                        res.statusCode = 500;
+                        res.json({
+                          "requestURL":  "/meetingRoom/" + meetingRoomId,
+                          "action": "delete",
+                          "status": 500,
+                          "message": "Query failed for Calendar",
+                          "timestamp": new Date()
+                        });
+                    }
+                    else {
+                        if(results2.affectedRows != 0) {
+                          res.statusCode = 200;
+                          res.json({
+                            "requestURL":  "/meetingRoom/" + meetingRoomId,
+                            "action": "delete",
+                            "status": 200,
+                            "message": "Meeting Room and their calendar deleted successfully",
+                            "timestamp": new Date()
+                          });
+                        } else { //if (results.affectedRows == 0) {
+                          res.statusCode = 404;
+                          res.json({
+                            "requestURL":  "/meetingRoom/" + meetingRoomId,
+                            "action": "delete",
+                            "status": 404,
+                            "message": "Calendar not found",
+                            "timestamp": new Date()
+                          });
+                      }
+                    }
+                });
+              } else { //if (results.affectedRows == 0) {
+                res.statusCode = 404;
+                res.json({
+                  "requestURL":  "/meetingRoom/" + meetingRoomId,
+                  "action": "delete",
+                  "status": 404,
+                  "message": "Meeting Room not found" ,
+                  "timestamp": new Date()
+                });
+            }
+          }
+      });
+      }
     });
 });
 
