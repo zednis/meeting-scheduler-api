@@ -61,25 +61,34 @@ var server = app.listen(port, function () {
 
 //create a meeting
 app.post("/meeting", function (req, res) {
-    var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
-    
+  if(!req.body.name || !req.body.startDateTime || 
+    !req.body.endDateTime || !req.body.attendees || 
+    !Array.isArray(req.body.attendees) || !(req.body.attendees).length) {
 
-    //console.log(req);
-    console.log(req.body);
+    res.statusCode = 400;
+      console.log();
+      res.json({
+        "requestURL":  "/meeting",
+        "action": "post",
+        "status": 400,
+        "message": "Bad Request",
+        "timestamp": new Date()
+      });
 
-    var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime) VALUES (?, ?, ?);";
-    var inserts = [name, startDateTime, endDateTime];
-    mysql.format(sql, inserts);
+  }
+  else {
+      var name = req.body.name || null;
+      var startDateTime = req.body.startDateTime || null;
+      var endDateTime = req.body.endDateTime || null;
+      var attendees = req.body.attendees || null;
 
-    console.log(mysql.format(sql, inserts));
+      //console.log("attendees: " + attendees);
+      
+      var attendeesSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email IN (?);";
+      var attendeesInserts = [attendees];
 
-    pool.query(sql, inserts, function(error, results, fields) {
-        // console.log(results);
-        // console.log(results[0]);
-        // console.log(error);
-        // console.log(fields);
+      console.log(mysql.format(attendeesSql, attendeesInserts));
+      pool.query(attendeesSql, attendeesInserts, function(error, results, fields) {
         if(error) {
             res.statusCode = 500;
             console.log(error);
@@ -91,19 +100,65 @@ app.post("/meeting", function (req, res) {
               "timestamp": new Date()
             });
         }
-        else {
-            res.statusCode = 201;
-            res.setHeader("Location", "/meeting/" + results.insertId);
+        else if(results.length == 0) {
+            res.statusCode = 404;
             res.json({
               "requestURL":  "/meeting",
               "action": "post",
-              "status": 201,
-              "message": "Meeting created successfully",
+              "status": 404,
+              "message": "Attendee(s) not found",
               "timestamp": new Date()
             });
         }
-    });
+        else {
+          console.log("Results: " + results);
+          console.log(results[0]);
+          var inserts = [];
+          for(var i = 0; i < results.length; i++) {
+            inserts.push([name, startDateTime, endDateTime, results[i].primary_calendar_fk]);
+          }
+          console.log(inserts);
 
+          var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk) VALUES ?;";
+          console.log(mysql.format(sql, inserts));
+
+          //console.log(mysql.format(sql, inserts));
+
+          pool.query(sql, [inserts], function(error1, results1, fields1) {
+              // console.log(results);
+              // console.log(results[0]);
+              // console.log(error);
+              // console.log(fields);
+              if(error1) {
+                  res.statusCode = 500;
+                  console.log(error1);
+                  res.json({
+                    "requestURL":  "/meeting",
+                    "action": "post",
+                    "status": 500,
+                    "message": "Query failed",
+                    "timestamp": new Date()
+                  });
+              }
+              else {
+                  res.statusCode = 201;
+                  res.setHeader("Location", "/meeting/" + results1.insertId);
+                  res.json({
+                    "requestURL":  "/meeting",
+                    "action": "post",
+                    "status": 201,
+                    "message": "Meeting created successfully",
+                    "timestamp": new Date()
+                  });
+              }
+          });
+        }
+      });
+
+    }
+
+      //console.log(req);
+      //console.log(req.body);
 });
 
 
@@ -413,18 +468,18 @@ app.get("/user/:userId", function (req, res) {
 app.put("/user/:userId", function (req, res) {
     var userId = req.params.userId;
 
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
-      res.statusCode = 400;
-      console.log();
-      res.json({
-        "requestURL":  "/user",
-        "action": "post",
-        "status": 400,
-        "message": "Bad Request",
-        "timestamp": new Date()
-      });
-    }
-    else {
+    // if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+    //   res.statusCode = 400;
+    //   console.log();
+    //   res.json({
+    //     "requestURL":  "/user",
+    //     "action": "post",
+    //     "status": 400,
+    //     "message": "Bad Request",
+    //     "timestamp": new Date()
+    //   });
+    // }
+    // /else {
       var email = req.body.email || null;
       var givenName = req.body.givenName || null;
       var familyName = req.body.familyName || null;
@@ -489,7 +544,7 @@ app.put("/user/:userId", function (req, res) {
             }
           }
       });
-    }
+    //}
 
 });
 
