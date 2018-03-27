@@ -46,6 +46,18 @@ paths:
           description: resource available in room
           type: string
           required: false
+        - in: query
+          name: availableFrom
+          description: availability window start datetime
+          type: string
+          format: date-time
+          required: false
+        - in: query
+          name: availableTo
+          description: availability window end datetime
+          type: string
+          format: date-time
+          required: false
       tags:
         - Rooms
       responses:
