@@ -12,7 +12,7 @@ produces:
 tags:
 - name: Meetings
 - name: Users
-- name: Room
+- name: Rooms
 paths:
 
   /api/room:
@@ -27,7 +27,7 @@ paths:
           schema:
             $ref: "#/definitions/CreateMeetingRoomRequest"
       tags:
-      - Room
+      - Rooms
       responses:
         201:
           description: Created
@@ -41,7 +41,7 @@ paths:
     get:
       summary: Retrieve List of Meeting Room Records
       tags:
-        - Room
+        - Rooms
       responses:
         200:
           description: OK
@@ -55,29 +55,55 @@ paths:
       parameters:
         - $ref: "#/parameters/roomName"
       tags:
-        - Room
+        - Rooms
       responses:
         200:
           description: OK
           schema:
             $ref: "#/definitions/MeetingRoomInfo"
 
-    put:
+    patch:
       summary: Update Meeting Room Record
       parameters:
         - $ref: "#/parameters/roomName"
+        - name: patch request
+          in: body
+          description: patch request
+          required: true
+          schema:
+            $ref: "#/definitions/PatchRequest"
       tags:
-        - Room
+        - Rooms
       responses:
         200:
           description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    put:
+      summary: Replace Meeting Room Record
+      parameters:
+        - $ref: "#/parameters/roomName"
+        - name: meeting room record
+          in: body
+          required: true
+          description: meeting room record
+          schema:
+            $ref: "#/definitions/MeetingRoomInfo"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
 
     delete:
       summary: Delete Meeting Room Record
       parameters:
         - $ref: "#/parameters/roomName"
       tags:
-        - Room
+        - Rooms
       responses:
         200:
           description: OK
@@ -147,6 +173,42 @@ paths:
           schema:
             $ref: "#/definitions/UserInfo"
 
+    patch:
+      summary: Update User Record
+      parameters:
+        - $ref: "#/parameters/userId"
+        - name: patch request
+          in: body
+          description: patch request
+          required: true
+          schema:
+            $ref: "#/definitions/PatchRequest"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    put:
+      summary: Replace User Record
+      parameters:
+        - $ref: "#/parameters/userId"
+        - name: user record
+          in: body
+          description: user record
+          required: true
+          schema:
+            $ref: "#/definitions/UserInfo"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
     delete:
       summary: Delete User Record
       parameters:
@@ -211,13 +273,31 @@ paths:
           schema:
             $ref: "#/definitions/MeetingInfo"
 
-    put:
+    patch:
       summary: Update Meeting Record
       parameters:
+        - $ref: "#/parameters/meetingId"
+        - name: patch request
+          in: body
+          description: patch request
+          required: true
+          schema:
+            $ref: "#/definitions/PatchRequest"
+      tags:
+        - Meetings
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    put:
+      summary: Replace Meeting Record
+      parameters:
       - $ref: "#/parameters/meetingId"
-      - name: meeting object
+      - name: meeting record
         in: body
-        description: meeting description
+        description: meeting record
         required: true
         schema:
           $ref: "#/definitions/MeetingInfo"
@@ -226,6 +306,8 @@ paths:
       responses:
         200:
           description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
 
     delete:
       summary: Delete Meeting Record
@@ -264,6 +346,31 @@ parameters:
 
 
 definitions:
+
+  PatchRequest:
+    type: object
+    properties:
+      resource:
+        type: string
+      changes:
+        type: array
+        items:
+          type: object
+          properties:
+            op:
+              type: string
+              enum: ["add", "remove", "replace", "test", "copy", "move"]
+            path:
+              type: string
+            from:
+              type: string
+            value: {}
+          required:
+            - op
+            - path
+    required:
+    - resource
+    - changes
 
   CreateMeetingRoomRequest:
     type: object
@@ -407,9 +514,15 @@ definitions:
       createdAt:
         type: string
         format: date-time
+      participants:
+        type: array
+        items:
+          description: userId
+          type: string
     required:
       - meetingId
       - name
+      - participants
       - startDateTime
       - endDateTime
       - createdAt
