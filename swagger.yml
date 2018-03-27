@@ -168,6 +168,22 @@ paths:
 
     get:
       summary: Retrieve List of User Records
+      parameters:
+        - in: query
+          name: email
+          description: user email
+          required: false
+          type: string
+        - in: query
+          name: givenName
+          description: firstname/given name
+          required: false
+          type: string
+        - in: query
+          name: familyName
+          description: lastname/family name
+          required: false
+          type: string
       tags:
         - Users
       responses:
