@@ -40,6 +40,12 @@ paths:
 
     get:
       summary: Retrieve List of Meeting Room Records
+      parameters:
+        - in: query
+          name: resources
+          description: resource available in room
+          type: string
+          required: false
       tags:
         - Rooms
       responses:
