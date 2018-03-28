@@ -42,8 +42,9 @@ var pool = mysql.createPool({
 // });
 
 app.get('/', function (req, res) {
-    res.sendFile(__dirname+ "/fullcalendar/demos/default.html");
+    //res.sendFile(__dirname + "/fullcalendar/demos/default.html");
     //res.json({message: "hello world!"});
+    res.redirect('/fullcalendar/demos/default.html');
 });
 
 app.get('/dbStatus', function (req, res) {
