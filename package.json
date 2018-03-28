@@ -4,8 +4,10 @@
   "private": true,
   "dependencies": {
     "aws-sdk": "latest",
-    "express": "latest",
     "body-parser": "latest",
+    "express": "latest",
+    "fullcalendar": "^3.9.0",
+    "jquery": "^3.3.1",
     "mysql": "latest",
     "promise": "latest"
   },

@@ -5,12 +5,15 @@ var bodyParser = require('body-parser');
 var Promise = require('promise');
 var mysql = require('mysql');
 
+var path =require("path");
+
 // AWS.config.region = process.env.REGION;
 
 var app = express();
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(bodyParser.json());
 app.set('etag', false);
+app.use(express.static(__dirname));
 
 var port = process.env.PORT || 3000;
 
@@ -24,22 +27,23 @@ var pool = mysql.createPool({
 });
 
 // test the connection to the DB
-var testConnection = new Promise(function(resolve, reject) {
+// var testConnection = new Promise(function(resolve, reject) {
 
-    return pool.getConnection(function(err, connection) {
-        if (err) {
-            console.error(err);
-            resolve(false);
-        }
+//     return pool.getConnection(function(err, connection) {
+//         if (err) {
+//             console.error(err);
+//             resolve(false);
+//         }
 
-        console.log("successfully connected to database!");
-        connection.release();
-        resolve(true);
-    });
-});
+//         console.log("successfully connected to database!");
+//         connection.release();
+//         resolve(true);
+//     });
+// });
 
 app.get('/', function (req, res) {
-    res.json({message: "hello world!"});
+    res.sendFile(__dirname+ "/fullcalendar/demos/default.html");
+    //res.json({message: "hello world!"});
 });
 
 app.get('/dbStatus', function (req, res) {
