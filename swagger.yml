@@ -1,0 +1,572 @@
+swagger: '2.0'
+info:
+  title: Meeting Scheduler API
+  contact:
+    name: API Support
+    email: zednis@rpi.edu
+  version: 1.0.0
+schemes:
+  - http
+produces:
+  - application/json
+tags:
+- name: Meetings
+- name: Users
+- name: Rooms
+paths:
+
+  /api/room:
+
+    post:
+      summary: Create Meeting Room Record
+      parameters:
+        - name: create meeting room request object
+          in: body
+          description: create meeting room request object
+          required: true
+          schema:
+            $ref: "#/definitions/CreateMeetingRoomRequest"
+      tags:
+      - Rooms
+      responses:
+        201:
+          description: Created
+          headers:
+            Location:
+              description: relative URL to created meeting room record
+              type: string
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    get:
+      summary: Retrieve List of Meeting Room Records
+      parameters:
+        - in: query
+          name: resources
+          description: resource available in room
+          type: string
+          required: false
+        - in: query
+          name: availableFrom
+          description: availability window start datetime
+          type: string
+          format: date-time
+          required: false
+        - in: query
+          name: availableTo
+          description: availability window end datetime
+          type: string
+          format: date-time
+          required: false
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ListOfMeetingRoomInfo"
+
+  /api/room/{roomName}:
+
+    get:
+      summary: Retrieve Meeting Room Record
+      parameters:
+        - $ref: "#/parameters/roomName"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/MeetingRoomInfo"
+
+    patch:
+      summary: Update Meeting Room Record
+      parameters:
+        - $ref: "#/parameters/roomName"
+        - name: patch request
+          in: body
+          description: patch request
+          required: true
+          schema:
+            $ref: "#/definitions/PatchRequest"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    put:
+      summary: Replace Meeting Room Record
+      parameters:
+        - $ref: "#/parameters/roomName"
+        - name: meeting room record
+          in: body
+          required: true
+          description: meeting room record
+          schema:
+            $ref: "#/definitions/MeetingRoomInfo"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    delete:
+      summary: Delete Meeting Room Record
+      parameters:
+        - $ref: "#/parameters/roomName"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+
+  /api/room/{roomName}/meetings:
+
+    get:
+      summary: Retrieve List of Meeting Records for Meeting Room
+      parameters:
+        - $ref: "#/parameters/roomName"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ListOfMeetingInfo"
+
+  /api/user:
+
+    post:
+      summary: Create User Record
+      parameters:
+        - name: create user request object
+          in: body
+          description: create user request object
+          required: true
+          schema:
+            $ref: "#/definitions/CreateUserRequest"
+      tags:
+        - Users
+      responses:
+        201:
+          description: Created
+          headers:
+            Location:
+              description: relative URL to created user record
+              type: string
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    get:
+      summary: Retrieve List of User Records
+      parameters:
+        - in: query
+          name: email
+          description: user email
+          required: false
+          type: string
+        - in: query
+          name: givenName
+          description: firstname/given name
+          required: false
+          type: string
+        - in: query
+          name: familyName
+          description: lastname/family name
+          required: false
+          type: string
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ListOfUserInfo"
+
+
+  /api/user/{userId}:
+
+    get:
+      summary: Retrieve User Record
+      parameters:
+        - $ref: "#/parameters/userId"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/UserInfo"
+
+    patch:
+      summary: Update User Record
+      parameters:
+        - $ref: "#/parameters/userId"
+        - name: patch request
+          in: body
+          description: patch request
+          required: true
+          schema:
+            $ref: "#/definitions/PatchRequest"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    put:
+      summary: Replace User Record
+      parameters:
+        - $ref: "#/parameters/userId"
+        - name: user record
+          in: body
+          description: user record
+          required: true
+          schema:
+            $ref: "#/definitions/UserInfo"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    delete:
+      summary: Delete User Record
+      parameters:
+        - $ref: "#/parameters/userId"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+
+  /api/user/{userId}/meetings:
+
+    get:
+      summary: Retrieve List of Meeting Records for User
+      parameters:
+        - $ref: "#/parameters/userId"
+      tags:
+        - Users
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ListOfMeetingInfo"
+
+  /api/meeting:
+
+    post:
+      summary: Create Meeting Record
+      parameters:
+        - name: create meeting request object
+          in: body
+          description: create meeting request object
+          required: true
+          schema:
+            $ref: "#/definitions/CreateMeetingRequest"
+      tags:
+        - Meetings
+      responses:
+        201:
+          description: Created
+          headers:
+            Location:
+              description: relative URL to created meeting record
+              type: string
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+  /api/meeting/{meetingId}:
+
+    get:
+      summary: Retrieve Meeting Record
+      parameters:
+      - $ref: "#/parameters/meetingId"
+      tags:
+       - Meetings
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/MeetingInfo"
+
+    patch:
+      summary: Update Meeting Record
+      parameters:
+        - $ref: "#/parameters/meetingId"
+        - name: patch request
+          in: body
+          description: patch request
+          required: true
+          schema:
+            $ref: "#/definitions/PatchRequest"
+      tags:
+        - Meetings
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    put:
+      summary: Replace Meeting Record
+      parameters:
+      - $ref: "#/parameters/meetingId"
+      - name: meeting record
+        in: body
+        description: meeting record
+        required: true
+        schema:
+          $ref: "#/definitions/MeetingInfo"
+      tags:
+      - Meetings
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+    delete:
+      summary: Delete Meeting Record
+      parameters:
+      - $ref: '#/parameters/meetingId'
+      tags:
+       - Meetings
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/ActionResponse"
+
+parameters:
+
+  roomName:
+    name: roomName
+    in: path
+    description: meeting room name
+    required: true
+    type: string
+
+  meetingId:
+    name: meetingId
+    in: path
+    description: meeting identifier
+    required: true
+    type: string
+
+  userId:
+    name: userId
+    in: path
+    description: user identifier
+    required: true
+    type: string
+
+
+definitions:
+
+  PatchRequest:
+    type: object
+    properties:
+      resource:
+        type: string
+      changes:
+        type: array
+        items:
+          type: object
+          properties:
+            op:
+              type: string
+              enum: ["add", "remove", "replace", "test", "copy", "move"]
+            path:
+              type: string
+            from:
+              type: string
+            value: {}
+          required:
+            - op
+            - path
+    required:
+    - resource
+    - changes
+
+  CreateMeetingRoomRequest:
+    type: object
+    properties:
+      name:
+        type: string
+      resources:
+        type: array
+        items:
+          type: string
+    required:
+      - name
+      - resources
+
+  ActionResponse:
+    type: object
+    properties:
+      requestURL:
+        type: string
+      action:
+        type: string
+      status:
+        type: number
+      message:
+        type: string
+      timestamp:
+        type: string
+        format: date-time
+    required:
+      - requestURL
+      - action
+      - status
+      - message
+      - timestamp
+
+  MeetingRoomInfo:
+    type: object
+    properties:
+      name:
+        type: string
+      resources:
+        type: array
+        items:
+          type: string
+      createdAt:
+        type: string
+        format: date-time
+    required:
+      - name
+      - resources
+      - createdAt
+
+  ListOfMeetingRoomInfo:
+    type: object
+    properties:
+      rooms:
+        type: array
+        items:
+          $ref: "#/definitions/MeetingRoomInfo"
+    required:
+      - rooms
+
+  CreateUserRequest:
+    type: object
+    properties:
+      givenName:
+        type: string
+      familyName:
+        type: string
+      email:
+        type: string
+    required:
+      - givenName
+      - familyName
+      - email
+
+  UserInfo:
+    type: object
+    properties:
+      userId:
+        type: string
+      givenName:
+        type: string
+      familyName:
+        type: string
+      email:
+        type: string
+      createdAt:
+        type: string
+        format: date-time
+    required:
+      - userId
+      - givenName
+      - familyName
+      - email
+      - createdAt
+
+  ListOfUserInfo:
+    type: object
+    properties:
+      users:
+        type: array
+        items:
+          $ref: "#/definitions/UserInfo"
+    required:
+      - users
+
+  CreateMeetingRequest:
+    type: object
+    properties:
+      name:
+        type: string
+      description:
+        type: string
+      startDateTime:
+        type: string
+        format: date-time
+      endDateTime:
+        type: string
+        format: date-time
+    required:
+      - name
+      - startDateTime
+      - endDateTime
+
+  MeetingInfo:
+    type: object
+    properties:
+      meetingId:
+        type: string
+      name:
+        type: string
+      description:
+        type: string
+      startDateTime:
+        type: string
+        format: date-time
+      endDateTime:
+        type: string
+        format: date-time
+      createdAt:
+        type: string
+        format: date-time
+      participants:
+        type: array
+        items:
+          description: userId
+          type: string
+    required:
+      - meetingId
+      - name
+      - participants
+      - startDateTime
+      - endDateTime
+      - createdAt
+
+  ListOfMeetingInfo:
+    type: object
+    properties:
+      meetings:
+        type: array
+        items:
+          $ref: "#/definitions/MeetingInfo"
+    required:
+      - meetings
