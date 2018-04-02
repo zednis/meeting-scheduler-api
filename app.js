@@ -62,10 +62,10 @@ var server = app.listen(port, function () {
 //create a meeting
 app.post("/meeting", function (req, res) {
   if(!req.body.name || !req.body.startDateTime || 
-    !req.body.endDateTime || !req.body.attendees || 
-    !Array.isArray(req.body.attendees) || !(req.body.attendees).length) {
+    !req.body.endDateTime || !req.body.participants || 
+    !Array.isArray(req.body.participants) || !(req.body.participants).length) {
 
-    res.statusCode = 400;
+      res.statusCode = 400;
       console.log();
       res.json({
         "requestURL":  "/meeting",
@@ -80,15 +80,18 @@ app.post("/meeting", function (req, res) {
       var name = req.body.name || null;
       var startDateTime = req.body.startDateTime || null;
       var endDateTime = req.body.endDateTime || null;
-      var attendees = req.body.attendees || null;
+      var participants = req.body.participants || null;
 
-      //console.log("attendees: " + attendees);
-      
-      var attendeesSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email IN (?);";
-      var attendeesInserts = [attendees];
+      //TO CHANGE
+      var organizerEmail = participants[0];
+      participants = req.body.participants.slice(1);
 
-      console.log(mysql.format(attendeesSql, attendeesInserts));
-      pool.query(attendeesSql, attendeesInserts, function(error, results, fields) {
+      //console.log("participants: " + participants);
+
+      var organizerSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email = (?);";
+      var organizerInserts = [organizerEmail];
+
+      pool.query(organizerSql, organizerInserts, function(error, results, fields) {
         if(error) {
             res.statusCode = 500;
             console.log(error);
@@ -100,61 +103,102 @@ app.post("/meeting", function (req, res) {
               "timestamp": new Date()
             });
         }
-        else if(results.length == 0) {
-            res.statusCode = 404;
-            res.json({
-              "requestURL":  "/meeting",
-              "action": "post",
-              "status": 404,
-              "message": "Attendee(s) not found",
-              "timestamp": new Date()
-            });
-        }
         else {
-          console.log("Results: " + results);
-          console.log(results[0]);
-          var inserts = [];
-          for(var i = 0; i < results.length; i++) {
-            inserts.push([name, startDateTime, endDateTime, results[i].primary_calendar_fk]);
-          }
-          console.log(inserts);
+          var orgMeetingSql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk, organizing_event) VALUES (?,?,?,?,?);";
+          var orgMeetingInserts = [name, startDateTime, endDateTime, results[0].primary_calendar_fk, null];
 
-          var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk) VALUES ?;";
-          console.log(mysql.format(sql, inserts));
+          pool.query(orgMeetingSql, orgMeetingInserts, function(error1, results1, fields1) {
+            if(error1) {
+                res.statusCode = 500;
+                console.log(error1);
+                res.json({
+                  "requestURL":  "/meeting",
+                  "action": "post",
+                  "status": 500,
+                  "message": "Query failed",
+                  "timestamp": new Date()
+                });
+            }
+            else if(participants.length == 0) {
+                res.statusCode = 201;
+                res.setHeader("Location", "/meeting/" + results1.insertId);
+                res.json({
+                  "requestURL":  "/meeting",
+                  "action": "post",
+                  "status": 201,
+                  "message": "Meeting created successfully",
+                  "timestamp": new Date()
+                });
+            }
+            else {
+              var orgEventId = results1.insertId;
 
-          //console.log(mysql.format(sql, inserts));
+              var participantsSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email IN (?);";
+              var participantsInserts = [participants];
 
-          pool.query(sql, [inserts], function(error1, results1, fields1) {
-              // console.log(results);
-              // console.log(results[0]);
-              // console.log(error);
-              // console.log(fields);
-              if(error1) {
-                  res.statusCode = 500;
-                  console.log(error1);
-                  res.json({
-                    "requestURL":  "/meeting",
-                    "action": "post",
-                    "status": 500,
-                    "message": "Query failed",
-                    "timestamp": new Date()
+              pool.query(participantsSql, participantsInserts, function(error2, results2, fields2) {
+                if(error2) {
+                    res.statusCode = 500;
+                    console.log(error2);
+                    res.json({
+                      "requestURL":  "/meeting",
+                      "action": "post",
+                      "status": 500,
+                      "message": "Query failed",
+                      "timestamp": new Date()
+                    });
+                }
+                else {
+
+                  var inserts = [];
+                  for(var i = 0; i < results.length; i++) {
+                    inserts.push([name, startDateTime, endDateTime, results[i].primary_calendar_fk, orgEventId]);
+                  }
+                  console.log(inserts);
+
+                  var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk, organizing_event) VALUES ?;";
+                  console.log(mysql.format(sql, inserts));
+
+                  //console.log(mysql.format(sql, inserts));
+
+                  pool.query(sql, [inserts], function(error3, results3, fields3) {
+                      // console.log(results);
+                      // console.log(results[0]);
+                      // console.log(error);
+                      // console.log(fields);
+                      if(error3) {
+                          res.statusCode = 500;
+                          console.log(error3);
+                          res.json({
+                            "requestURL":  "/meeting",
+                            "action": "post",
+                            "status": 500,
+                            "message": "Query failed",
+                            "timestamp": new Date()
+                          });
+                      }
+                      else {
+                          res.statusCode = 201;
+                          res.setHeader("Location", "/meeting/" + orgEventId);
+                          res.json({
+                            "requestURL":  "/meeting",
+                            "action": "post",
+                            "status": 201,
+                            "message": "Meeting created successfully",
+                            "timestamp": new Date()
+                          });
+                      }
                   });
-              }
-              else {
-                  res.statusCode = 201;
-                  res.setHeader("Location", "/meeting/" + results1.insertId);
-                  res.json({
-                    "requestURL":  "/meeting",
-                    "action": "post",
-                    "status": 201,
-                    "message": "Meeting created successfully",
-                    "timestamp": new Date()
-                  });
-              }
+
+                }
+
+              });
+
+            }
           });
         }
-      });
-
+      }); 
+    
     }
 
       //console.log(req);
