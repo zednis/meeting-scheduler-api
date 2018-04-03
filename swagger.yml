@@ -80,10 +80,12 @@ paths:
           schema:
             $ref: "#/definitions/MeetingRoomInfo"
 
+  /api/room/{roomId}:
+
     patch:
       summary: Update Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
         - name: patch request
           in: body
           description: patch request
@@ -101,7 +103,7 @@ paths:
     put:
       summary: Replace Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
         - name: meeting room record
           in: body
           required: true
@@ -119,7 +121,7 @@ paths:
     delete:
       summary: Delete Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
       tags:
         - Rooms
       responses:
@@ -356,6 +358,12 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 parameters:
+  roomId:
+    name: roomId
+    in: path
+    description: room identifier
+    required: true
+    type: string
 
   roomName:
     name: roomName
