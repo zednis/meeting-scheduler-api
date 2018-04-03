@@ -82,6 +82,18 @@ paths:
 
   /api/room/{roomId}:
 
+    get:
+      summary: Retrieve Meeting Room Record
+      parameters:
+        - $ref: "#/parameters/roomId"
+      tags:
+        - Rooms
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/MeetingRoomInfo"
+
     patch:
       summary: Update Meeting Room Record
       parameters:
