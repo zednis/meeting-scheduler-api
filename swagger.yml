@@ -58,6 +58,11 @@ paths:
           type: string
           format: date-time
           required: false
+        - in: query
+          name: roomName
+          description: room name
+          type: string
+          required: false
       tags:
         - Rooms
       responses:
@@ -66,12 +71,12 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingRoomInfo"
 
-  /api/room/{roomName}:
+  /api/room/{roomId}:
 
     get:
       summary: Retrieve Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
       tags:
         - Rooms
       responses:
@@ -83,7 +88,7 @@ paths:
     patch:
       summary: Update Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
         - name: patch request
           in: body
           description: patch request
@@ -101,7 +106,7 @@ paths:
     put:
       summary: Replace Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
         - name: meeting room record
           in: body
           required: true
@@ -119,7 +124,7 @@ paths:
     delete:
       summary: Delete Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomName"
+        - $ref: "#/parameters/roomId"
       tags:
         - Rooms
       responses:
@@ -356,11 +361,10 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 parameters:
-
-  roomName:
-    name: roomName
+  roomId:
+    name: roomId
     in: path
-    description: meeting room name
+    description: room identifier
     required: true
     type: string
 
