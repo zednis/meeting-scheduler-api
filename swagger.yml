@@ -368,13 +368,6 @@ parameters:
     required: true
     type: string
 
-  roomName:
-    name: roomName
-    in: path
-    description: meeting room name
-    required: false
-    type: string
-
   meetingId:
     name: meetingId
     in: path
