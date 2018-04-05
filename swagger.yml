@@ -58,6 +58,11 @@ paths:
           type: string
           format: date-time
           required: false
+        - in: query
+          name: roomName
+          description: room name
+          type: string
+          required: false
       tags:
         - Rooms
       responses:
@@ -65,20 +70,6 @@ paths:
           description: OK
           schema:
             $ref: "#/definitions/ListOfMeetingRoomInfo"
-
-  /api/room/{roomName}:
-
-    get:
-      summary: Retrieve Meeting Room Record
-      parameters:
-        - $ref: "#/parameters/roomName"
-      tags:
-        - Rooms
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: "#/definitions/MeetingRoomInfo"
 
   /api/room/{roomId}:
 
@@ -381,7 +372,7 @@ parameters:
     name: roomName
     in: path
     description: meeting room name
-    required: true
+    required: false
     type: string
 
   meetingId:
