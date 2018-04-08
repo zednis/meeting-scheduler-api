@@ -69,7 +69,7 @@ app.post("/meeting", function (req, res) {
     //console.log(req);
     console.log(req.body);
 
-    var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime) VALUES (?, ?, ?);";
+    var sql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime) VALUES (?, ?, ?);";
     var inserts = [name, startDateTime, endDateTime];
     mysql.format(sql, inserts);
 
@@ -312,7 +312,7 @@ app.post("/user", function (req, res) {
             });
         }
         else {
-            var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar_fk) VALUES (?, ?, ?, ?);";
+            var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar) VALUES (?, ?, ?, ?);";
 
             //primary_calendar_fk remains null. would have to do an additional nested query to update it.
 
