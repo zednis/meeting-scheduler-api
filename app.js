@@ -151,8 +151,9 @@ app.post("/meeting", function (req, res) {
                 else {
 
                   var inserts = [];
-                  for(var i = 0; i < results.length; i++) {
-                    inserts.push([name, startDateTime, endDateTime, results[i].primary_calendar_fk, orgEventId]);
+                  var participantFks = results2;
+                  for(var i = 0; i < participantFks.length; i++) {
+                    inserts.push([name, startDateTime, endDateTime, participantFks[i].primary_calendar_fk, orgEventId]);
                   }
                   console.log(inserts);
 
