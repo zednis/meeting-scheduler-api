@@ -135,7 +135,7 @@ app.post("/meeting", function (req, res) {
                   var orgMeetingSql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk, organizing_event) VALUES (?,?,?,?,?);";
                   var orgMeetingInserts = [name, startDateTime, endDateTime, results[0].primary_calendar_fk, null];
 
-                  pool.query(orgMeetingSql, orgMeetingInserts, function(error1, results1, fields1) {
+                  connection.query(orgMeetingSql, orgMeetingInserts, function(error1, results1, fields1) {
                     if(error1) {
                         return connection.rollback(function() {
                           res.statusCode = 500;
@@ -183,7 +183,7 @@ app.post("/meeting", function (req, res) {
                       var participantsSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email IN (?);";
                       var participantsInserts = [participants];
 
-                      pool.query(participantsSql, participantsInserts, function(error2, results2, fields2) {
+                      connection.query(participantsSql, participantsInserts, function(error2, results2, fields2) {
                         if(error2) {
                             return connection.rollback(function() {
                               res.statusCode = 500;
@@ -211,7 +211,7 @@ app.post("/meeting", function (req, res) {
 
                           //console.log(mysql.format(sql, inserts));
 
-                          pool.query(sql, [inserts], function(error3, results3, fields3) {
+                          connection.query(sql, [inserts], function(error3, results3, fields3) {
                               // console.log(results);
                               // console.log(results[0]);
                               // console.log(error);
@@ -239,7 +239,7 @@ app.post("/meeting", function (req, res) {
                                           "requestURL":  "/meeting",
                                           "action": "post",
                                           "status": 500,
-                                          "message": "Query failed",
+                                          "message": "Queries failed to commit",
                                           "timestamp": new Date()
                                         });
                                       });
@@ -468,64 +468,114 @@ app.post("/user", function (req, res) {
       var calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
       var calendarInserts = [calendarName];
 
-     //create calendar for the user
-      pool.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
-        if(error1) {
-            res.statusCode = 500;
-            console.log(error1);
-            res.json({
-              "requestURL":  "/user",
-              "action": "post",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
+       pool.getConnection(function(err,connection) {
+        if(err) {
+           console.warn("Failed to get connection from pool");
+           res.statusCode = 500;
+           res.json({
+             "requestURL":  "/user",
+             "action": "post",
+             "status": 500,
+             "message": "Failed to getConnection from pool",
+             "timestamp": new Date()
+           });
         }
         else {
-            var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar_fk) VALUES (?, ?, ?, ?);";
-
-            //primary_calendar_fk remains null. would have to do an additional nested query to update it.
-
-            var inserts = [email, givenName, familyName, results1.insertId];
-            mysql.format(sql, inserts);
-
-            console.log(mysql.format(sql, inserts));
-
-            //create user w given params
-            pool.query(sql, inserts, function(error, results, fields) {
-                // console.log(results);
-                // console.log(results[0]);
-                // console.log(error);
-                // console.log(fields);
-                if(error) {
-                    res.statusCode = 500;
-                    console.log(error);
-                    res.json({
-                      "requestURL":  "/user",
-                      "action": "post",
-                      "status": 500,
-                      "message": "Query failed",
-                      "timestamp": new Date()
+          connection.beginTransaction(function(err) {
+            if(err) {
+              console.warn("Transaction failed to start");
+              res.statusCode = 500;
+              res.json({
+                "requestURL":  "/user",
+                "action": "post",
+                "status": 500,
+                "message": "Transaction failed to start",
+                "timestamp": new Date()
+              });
+            }
+            else {
+              //create calendar for the user
+              connection.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
+                if(error1) {
+                    return connection.rollback(function() {
+                      res.statusCode = 500;
+                      console.log(error1);
+                      res.json({
+                        "requestURL":  "/user",
+                        "action": "post",
+                        "status": 500,
+                        "message": "Query failed",
+                        "timestamp": new Date()
+                      });
                     });
                 }
                 else {
-                    res.statusCode = 201;
-                    res.setHeader("Location", "/user/" + results.insertId);
-                    res.json({
-                      "requestURL":  "/user",
-                      "action": "post",
-                      "status": 201,
-                      "message": "User created successfully",
-                      "timestamp": new Date()
+                    var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar_fk) VALUES (?, ?, ?, ?);";
+
+                    //primary_calendar_fk remains null. would have to do an additional nested query to update it.
+
+                    var inserts = [email, givenName, familyName, results1.insertId];
+                    mysql.format(sql, inserts);
+
+                    console.log(mysql.format(sql, inserts));
+
+                    //create user w given params
+                    connection.query(sql, inserts, function(error, results, fields) {
+                        // console.log(results);
+                        // console.log(results[0]);
+                        // console.log(error);
+                        // console.log(fields);
+                        if(error) {
+                            return connection.rollback(function() {
+                              res.statusCode = 500;
+                              console.log(error1);
+                              res.json({
+                                "requestURL":  "/user",
+                                "action": "post",
+                                "status": 500,
+                                "message": "Query failed",
+                                "timestamp": new Date()
+                              });
+                            });
+                        }
+                        else {
+                            connection.commit(function(err) {
+                              if(err) {
+                                return connection.rollback(function() {
+                                  res.statusCode = 500;
+                                  console.log(error1);
+                                  res.json({
+                                    "requestURL":  "/user",
+                                    "action": "post",
+                                    "status": 500,
+                                    "message": "Queries failed to commit",
+                                    "timestamp": new Date()
+                                  });
+                                });
+                              }
+                              else {
+                                res.statusCode = 201;
+                                res.setHeader("Location", "/user/" + results.insertId);
+                                res.json({
+                                  "requestURL":  "/user",
+                                  "action": "post",
+                                  "status": 201,
+                                  "message": "User created successfully",
+                                  "timestamp": new Date()
+                                });
+                              }
+                            });
+                            
+                        }
                     });
-                }
-            });
 
+                 }
+              }); 
+            }
+          });
         }
-    }); 
+      });
     }
-
-    
 });
 
 
@@ -672,93 +722,150 @@ app.delete("/user/:userId", function (req, res) {
 
     var calendarFkSql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
 
-    pool.query(calendarFkSql, function(error, results, fields) {
-      if(error) {
-          console.warn("Query failed");
-          console.log(error);
-          res.statusCode = 500;
-          res.json({
-            "requestURL":  "/user/" + userId,
-            "action": "delete",
-            "status": 500,
-            "message": "Query failed",
-            "timestamp": new Date()
-          });
-      }
-      else {
-        console.log("Results: " + results[0]);
-        var calendarId = results[0].primary_calendar_fk;
-        console.log("ID: " + calendarId);
-
-        var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
-      
-      //delete User then Calendar
-
-      pool.query(sql, function(error1, results1, fields) {
-          if(error1) {
-              console.warn("User query failed");
-              console.log(error);
+    pool.getConnection(function(err,connection) {
+        if(err) {
+           console.warn("Failed to get connection from pool");
+           res.statusCode = 500;
+           res.json({
+             "requestURL":  "/user",
+             "action": "post",
+             "status": 500,
+             "message": "Failed to getConnection from pool",
+             "timestamp": new Date()
+           });
+        }
+        else {
+          connection.beginTransaction(function(err) {
+            if(err) {
+              console.warn("Transaction failed to start");
               res.statusCode = 500;
               res.json({
-                "requestURL":  "/user/" + userId,
-                "action": "delete",
+                "requestURL":  "/user",
+                "action": "post",
                 "status": 500,
-                "message": "Query failed for User",
+                "message": "Transaction failed to start",
                 "timestamp": new Date()
               });
-          }
-          else {
-              if(results1.affectedRows != 0) {
-                 var calendarSql = "DELETE FROM ebdb.Calendar WHERE id = " + pool.escape(calendarId);
+            }
+            else {
+              connection.query(calendarFkSql, function(error, results, fields) {
+                if(error) {
+                    console.warn("Query failed");
+                    console.log(error);
+                    res.statusCode = 500;
+                    res.json({
+                      "requestURL":  "/user/" + userId,
+                      "action": "delete",
+                      "status": 500,
+                      "message": "Query failed",
+                      "timestamp": new Date()
+                    });
+                }
+                else {
+                  console.log("Results: " + results[0]);
+                  var calendarId = results[0].primary_calendar_fk;
+                  console.log("ID: " + calendarId);
+
+                  var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
                 
-                pool.query(calendarSql, function(error2, results2, fields2) {
-                    if(error2) {
-                        console.warn("Calendar query failed");
-                        console.log(error2);
-                        res.statusCode = 500;
-                        res.json({
-                          "requestURL":  "/user/" + userId,
-                          "action": "delete",
-                          "status": 500,
-                          "message": "Query failed for Calendar",
-                          "timestamp": new Date()
-                        });
-                    }
-                    else {
-                        if(results2.affectedRows != 0) {
-                          res.statusCode = 200;
-                          res.json({
-                            "requestURL":  "/user/" + userId,
-                            "action": "delete",
-                            "status": 200,
-                            "message": "User and their calendar deleted successfully",
-                            "timestamp": new Date()
-                          });
-                        } else { //if (results.affectedRows == 0) {
-                          res.statusCode = 404;
-                          res.json({
-                            "requestURL":  "/user/" + userId,
-                            "action": "delete",
-                            "status": 404,
-                            "message": "Calendar not found",
-                            "timestamp": new Date()
+                  //delete User then Calendar
+
+                  connection.query(sql, function(error1, results1, fields) {
+                      if(error1) {
+                          return connection.rollback(function() {
+                            console.warn("User query failed");
+                            console.log(error);
+                            res.statusCode = 500;
+                            res.json({
+                              "requestURL":  "/user/" + userId,
+                              "action": "delete",
+                              "status": 500,
+                              "message": "Query failed for User",
+                              "timestamp": new Date()
+                            });
                           });
                       }
-                    }
-                });
-              } else { //if (results.affectedRows == 0) {
-                res.statusCode = 404;
-                res.json({
-                  "requestURL":  "/user/" + userId,
-                  "action": "delete",
-                  "status": 404,
-                  "message": "User not found" ,
-                  "timestamp": new Date()
-                });
+                      else {
+                          if(results1.affectedRows != 0) {
+                             var calendarSql = "DELETE FROM ebdb.Calendar WHERE id = " + connection.escape(calendarId);
+                            
+                            connection.query(calendarSql, function(error2, results2, fields2) {
+                                if(error2) {
+                                    return connection.rollback(function() {
+                                      console.warn("Calendar query failed");
+                                      console.log(error2);
+                                      res.statusCode = 500;
+                                      res.json({
+                                        "requestURL":  "/user/" + userId,
+                                        "action": "delete",
+                                        "status": 500,
+                                        "message": "Query failed for Calendar",
+                                        "timestamp": new Date()
+                                      });
+                                    });
+                                }
+                                else {
+                                    if(results2.affectedRows != 0) {
+                                      connection.commit(function(err) {
+                                        if(err) {
+                                          return connection.rollback(function() {
+                                            console.warn("Commit failed");
+                                            console.log(error2);
+                                            res.statusCode = 500;
+                                            res.json({
+                                              "requestURL":  "/user/" + userId,
+                                              "action": "delete",
+                                              "status": 500,
+                                              "message": "Commit failed",
+                                              "timestamp": new Date()
+                                            });
+                                          });
+                                        }
+                                        else {
+                                          res.statusCode = 200;
+                                          res.json({
+                                            "requestURL":  "/user/" + userId,
+                                            "action": "delete",
+                                            "status": 200,
+                                            "message": "User and their calendar deleted successfully",
+                                            "timestamp": new Date()
+                                          });
+                                        }
+                                      });
+                                      
+                                    } else { //if (results.affectedRows == 0) {
+                                      return connection.rollback(function() {
+                                        res.statusCode = 404;
+                                        res.json({
+                                          "requestURL":  "/user/" + userId,
+                                          "action": "delete",
+                                          "status": 404,
+                                          "message": "Calendar not found",
+                                          "timestamp": new Date()
+                                        });
+                                      });
+                                  }
+                                }
+                            });
+                          } else { //if (results.affectedRows == 0) {
+                            return connection.rollback(function() {
+                              res.statusCode = 404;
+                              res.json({
+                                "requestURL":  "/user/" + userId,
+                                "action": "delete",
+                                "status": 404,
+                                "message": "User not found" ,
+                                "timestamp": new Date()
+                              });
+                            });
+                          }
+                      }
+                  });
+                }
+              });
             }
-          }
-      });
-      }
+          });
+        }
     });
 });
 
