@@ -448,7 +448,7 @@ app.delete("/meeting/:meetingId", function (req, res) {
 //create a user
 app.post("/user", function (req, res) {
 
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+    if(!req.body.email || !req.body.given_name || !req.body.family_name) {
       res.statusCode = 400;
       console.log();
       res.json({
@@ -461,10 +461,10 @@ app.post("/user", function (req, res) {
     }
     else {
       var email = req.body.email || null;
-      var givenName = req.body.givenName || null;
-      var familyName = req.body.familyName || null;
+      var given_name = req.body.given_name || null;
+      var family_name = req.body.family_name || null;
 
-      var calendarName = givenName + "'s Meeting Room Calendar";
+      var calendarName = given_name + "'s Meeting Room Calendar";
       var calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
       var calendarInserts = [calendarName];
 
@@ -514,7 +514,7 @@ app.post("/user", function (req, res) {
 
                     //primary_calendar remains null. would have to do an additional nested query to update it.
 
-                    var inserts = [email, givenName, familyName, results1.insertId];
+                    var inserts = [email, given_name, family_name, results1.insertId];
                     mysql.format(sql, inserts);
 
                     console.log(mysql.format(sql, inserts));
@@ -633,7 +633,7 @@ app.get("/user/:userId", function (req, res) {
 app.put("/user/:userId", function (req, res) {
     var userId = req.params.userId;
   
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+    if(!req.body.email || !req.body.given_name || !req.body.family_name) {
       res.statusCode = 400;
       console.log();
       res.json({
@@ -646,8 +646,8 @@ app.put("/user/:userId", function (req, res) {
     }
     else {
       var email = req.body.email || null;
-      var givenName = req.body.givenName || null;
-      var familyName = req.body.familyName || null;
+      var given_name = req.body.given_name || null;
+      var family_name = req.body.family_name || null;
 
       var sql = "UPDATE ebdb.User";
 
@@ -655,8 +655,8 @@ app.put("/user/:userId", function (req, res) {
 
       var sqlInserts = {
           email: email, 
-          given_name: givenName, 
-          family_name: familyName
+          given_name: given_name, 
+          family_name: family_name
       };
 
       //console.log(sqlInserts)
@@ -709,7 +709,7 @@ app.put("/user/:userId", function (req, res) {
             }
           }
       });
-    //}
+    }
 
 });
 
