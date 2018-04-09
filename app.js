@@ -61,8 +61,8 @@ var server = app.listen(port, function () {
 
 //create a meeting
 app.post("/meeting", function (req, res) {
-  if(!req.body.name || !req.body.startDateTime || 
-    !req.body.endDateTime || !req.body.participants || 
+  if(!req.body.name || !req.body.start_datetime || 
+    !req.body.end_datetime || !req.body.participants || 
     !Array.isArray(req.body.participants) || !(req.body.participants).length) {
 
       res.statusCode = 400;
@@ -78,8 +78,8 @@ app.post("/meeting", function (req, res) {
   }
   else {
       var name = req.body.name || null;
-      var startDateTime = req.body.startDateTime || null;
-      var endDateTime = req.body.endDateTime || null;
+      var start_datetime = req.body.start_datetime || null;
+      var end_datetime = req.body.end_datetime || null;
       var participants = req.body.participants || null;
 
       //TO CHANGE
@@ -88,7 +88,7 @@ app.post("/meeting", function (req, res) {
 
       //console.log("participants: " + participants);
 
-      var organizerSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email = (?);";
+      var organizerSql = "SELECT primary_calendar FROM ebdb.User WHERE email = (?);";
       var organizerInserts = [organizerEmail];
 
       pool.getConnection(function(err,connection) {
@@ -132,8 +132,8 @@ app.post("/meeting", function (req, res) {
                     });
                 }
                 else {
-                  var orgMeetingSql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk, organizing_event) VALUES (?,?,?,?,?);";
-                  var orgMeetingInserts = [name, startDateTime, endDateTime, results[0].primary_calendar_fk, null];
+                  var orgMeetingSql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime, user_calendar, organizing_event) VALUES (?,?,?,?,?);";
+                  var orgMeetingInserts = [name, start_datetime, end_datetime, results[0].primary_calendar, null];
 
                   connection.query(orgMeetingSql, orgMeetingInserts, function(error1, results1, fields1) {
                     if(error1) {
@@ -180,7 +180,7 @@ app.post("/meeting", function (req, res) {
                     else {
                       var orgEventId = results1.insertId;
 
-                      var participantsSql = "SELECT primary_calendar_fk FROM ebdb.User WHERE email IN (?);";
+                      var participantsSql = "SELECT primary_calendar FROM ebdb.User WHERE email IN (?);";
                       var participantsInserts = [participants];
 
                       connection.query(participantsSql, participantsInserts, function(error2, results2, fields2) {
@@ -202,11 +202,11 @@ app.post("/meeting", function (req, res) {
                          var inserts = [];
                          var participantFks = results2;
                           for(var i = 0; i < participantFks.length; i++) {
-                            inserts.push([name, startDateTime, endDateTime, participantFks[i].primary_calendar_fk, orgEventId]);
+                            inserts.push([name, start_datetime, end_datetime, participantFks[i].primary_calendar, orgEventId]);
                           }
                           console.log(inserts);
 
-                          var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime, user_calendar_fk, organizing_event) VALUES ?;";
+                          var sql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime, user_calendar, organizing_event) VALUES ?;";
                           console.log(mysql.format(sql, inserts));
 
                           //console.log(mysql.format(sql, inserts));
@@ -331,8 +331,8 @@ app.get("/meeting/:meetingId", function (req, res) {
 app.put("/meeting/:meetingId", function (req, res) {
     var meetingId = req.params.meetingId;
     var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
+    var start_datetime = req.body.start_datetime || null;
+    var end_datetime = req.body.end_datetime || null;
 
     var sql = "UPDATE ebdb.Meeting";
 
@@ -340,8 +340,8 @@ app.put("/meeting/:meetingId", function (req, res) {
 
     var sqlInserts = {
         name: name, 
-        startDateTime: startDateTime, 
-        endDateTime: endDateTime
+        start_datetime: start_datetime, 
+        end_datetime: end_datetime
     };
 
     //console.log(sqlInserts)
@@ -510,9 +510,9 @@ app.post("/user", function (req, res) {
                     });
                 }
                 else {
-                    var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar_fk) VALUES (?, ?, ?, ?);";
+                    var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar) VALUES (?, ?, ?, ?);";
 
-                    //primary_calendar_fk remains null. would have to do an additional nested query to update it.
+                    //primary_calendar remains null. would have to do an additional nested query to update it.
 
                     var inserts = [email, givenName, familyName, results1.insertId];
                     mysql.format(sql, inserts);
@@ -763,7 +763,7 @@ app.delete("/user/:userId", function (req, res) {
                 }
                 else {
                   console.log("Results: " + results[0]);
-                  var calendarId = results[0].primary_calendar_fk;
+                  var calendarId = results[0].primary_calendar;
                   console.log("ID: " + calendarId);
 
                   var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
@@ -937,7 +937,7 @@ app.post("/room", function (req, res) {
                 }
                 else {
                   
-                    var sql = "INSERT INTO ebdb.MeetingRoom (name, calendar_fk) VALUES (?, ?);";
+                    var sql = "INSERT INTO ebdb.MeetingRoom (name, calendar) VALUES (?, ?);";
 
                     var inserts = [name, results.insertId];
                     mysql.format(sql, inserts);
@@ -1208,7 +1208,7 @@ app.delete("/room/:roomId", function (req, res) {
               }
               else {
                 console.log("Results: " + results[0]);
-                var calendarId = results[0].calendar_fk;
+                var calendarId = results[0].calendar;
                 console.log("ID: " + calendarId);
 
                 var sql = "DELETE FROM ebdb.MeetingRoom WHERE id = " + pool.escape(roomId);
