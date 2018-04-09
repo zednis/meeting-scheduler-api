@@ -24,10 +24,12 @@ CREATE INDEX meeting_calendar_idx on Meeting (calendar);
 
 CREATE TABLE IF NOT EXISTS MeetingRoom (
 	id INT AUTO_INCREMENT PRIMARY KEY,
-	name VARCHAR(45) NOT NULL,
+	name VARCHAR(45) NOT NULL UNIQUE,
 	calendar INT NULL,
 	CONSTRAINT meeting_room_calendar_fk FOREIGN KEY (calendar) REFERENCES Calendar (id) ON DELETE CASCADE
 );
+
+CREATE INDEX meeting_room_name_idx ON MeetingRoom (name);
 
 CREATE INDEX meeting_room_calendar_idx ON MeetingRoom (calendar);
 
