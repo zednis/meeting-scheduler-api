@@ -35,31 +35,31 @@ var server = app.listen(port, function () {
 });
 
 //create a meeting
-app.post("/api/meeting", function (req, res) {
+app.post("/api/meetings", function (req, res) {
     console.log(req.body);
     create(req, res, api.createMeeting, req.body);
 });
 
 // retrieving a meeting
-app.get("/api/meeting/:meetingId", function (req, res) {
+app.get("/api/meetings/:meetingId", function (req, res) {
     const meetingId = req.params.meetingId;
     get(req, res, api.getMeetingById, meetingId);
 });
 
 // update a meeting
-app.put("/api/meeting/:meetingId", function (req, res) {
+app.put("/api/meetings/:meetingId", function (req, res) {
     const obj = { meetingId: req.params.meetingId, body: req.body };
     update(req, res, api.updateMeeting, obj);
 });
 
 // delete a meeting
-app.delete("/api/meeting/:meetingId", function (req, res) {
+app.delete("/api/meetings/:meetingId", function (req, res) {
     const meetingId = req.params.meetingId;
     _delete(req, res, api.deleteMeeting, meetingId);
 });
 
 // create a user
-app.post("/api/user", function (req, res) {
+app.post("/api/users", function (req, res) {
     // TODO verify req body and return status 400 if not valid
     const user = {
         email: req.body.email || null,
@@ -70,8 +70,13 @@ app.post("/api/user", function (req, res) {
     create(req, res, api.createUser, user);
 });
 
+// TODO create a meeting on the user's calendar
+// app.post("/api/user/:userId/meetings", function (req, res) {
+// TODO code me
+// });
+
 //retrieving a user
-app.get("/api/user/:userId", function (req, res) {
+app.get("/api/users/:userId", function (req, res) {
     const userId = req.params.userId;
     get(req, res, api.getUserById, userId);
 });
@@ -82,26 +87,26 @@ app.get("/api/user/:userId", function (req, res) {
 // });
 
 //update a user
-app.put("/api/user/:userId", function (req, res) {
+app.put("/api/users/:userId", function (req, res) {
     const obj = { userId: req.params.userId, body: req.body };
     update(req, res, api.updateUser, obj);
 });
 
 //delete a user
-app.delete("/api/user/:userId", function (req, res) {
+app.delete("/api/users/:userId", function (req, res) {
     const userId = req.params.userId;
     _delete(req, res, api.deleteUser, userId);
 });
 
 //create a meeting room
-app.post("/api/room", function (req, res) {
+app.post("/api/rooms", function (req, res) {
     create(req, res, api.createRoom, req.body);
 });
 
 //retrieving a meeting room
-app.get("/api/room/:roomId", function (req, res) {
-    const roomId = req.params.roomId;
-    get(req, res, api.getRoomById, roomId);
+app.get("/api/rooms/:roomName", function (req, res) {
+    const roomName = req.params.roomName;
+    get(req, res, api.getRoomByName, roomName);
 });
 
 // TODO retrieve a list of meeting rooms, filtered by query parameters
@@ -109,20 +114,21 @@ app.get("/api/room/:roomId", function (req, res) {
 // TODO code me
 // });
 
-// TODO retrieve a list of meetings for the specified room, filtered by query parameters
-// app.get("/api/room:roomId/meetings", function (req, res) {
-// TODO code me
-// });
+// retrieve a list of meetings for the specified room, filtered by query parameters
+app.get("/api/rooms/:roomName/meetings", function (req, res) {
+    const roomName = req.params.roomName;
+    get(req, res, api.getMeetingsByRoomName, roomName);
+});
 
 //update a meeting room
-app.put("/api/room/:roomId", function (req, res) {
-    const obj = { roomId: req.params.roomId, body: req.body };
+app.put("/api/rooms/:roomName", function (req, res) {
+    const obj = { roomId: req.params.roomName, body: req.body };
     update(req, res, api.updateRoom, obj);
 });
 
 //delete a meeting room
-app.delete("/api/room/:roomId", function (req, res) {
-   _delete(req, res, api.deleteRoom, req.params.roomId);
+app.delete("/api/rooms/:roomName", function (req, res) {
+   _delete(req, res, api.deleteRoom, req.params.roomName);
 });
 
 function _delete(req, res, apicall, parameter) {
@@ -163,9 +169,9 @@ function create(req, res, apicall, object ) {
     apicall(object)
         .then(function (result) {
             res.statusCode = 201;
-            res.setHeader("Location", req.originalUrl + "/" + result.createdId);
+            res.setHeader("Location", req.originalUrl + "/" + encodeURIComponent(result.createdId));
             msg.status = 201;
-            msg.created = req.originalUrl + "/" + result.createdId;
+            msg.created = req.originalUrl + "/" + encodeURIComponent(result.createdId);
             res.send(msg);
         })
         .catch(function (error) {

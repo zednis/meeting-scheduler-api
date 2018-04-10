@@ -15,7 +15,7 @@ tags:
 - name: Rooms
 paths:
 
-  /api/room:
+  /api/rooms:
 
     post:
       summary: Create Meeting Room Record
@@ -71,12 +71,12 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingRoomInfo"
 
-  /api/room/{roomId}:
+  /api/rooms/{roomName}:
 
     get:
       summary: Retrieve Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomId"
+        - $ref: "#/parameters/roomName"
       tags:
         - Rooms
       responses:
@@ -88,7 +88,7 @@ paths:
     patch:
       summary: Update Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomId"
+        - $ref: "#/parameters/roomName"
         - name: patch request
           in: body
           description: patch request
@@ -106,7 +106,7 @@ paths:
     put:
       summary: Replace Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomId"
+        - $ref: "#/parameters/roomName"
         - name: meeting room record
           in: body
           required: true
@@ -124,7 +124,7 @@ paths:
     delete:
       summary: Delete Meeting Room Record
       parameters:
-        - $ref: "#/parameters/roomId"
+        - $ref: "#/parameters/roomName"
       tags:
         - Rooms
       responses:
@@ -134,7 +134,7 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 
-  /api/room/{roomName}/meetings:
+  /api/rooms/{roomName}/meetings:
 
     get:
       summary: Retrieve List of Meeting Records for Meeting Room
@@ -148,7 +148,7 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingInfo"
 
-  /api/user:
+  /api/users:
 
     post:
       summary: Create User Record
@@ -198,7 +198,7 @@ paths:
             $ref: "#/definitions/ListOfUserInfo"
 
 
-  /api/user/{userId}:
+  /api/users/{userId}:
 
     get:
       summary: Retrieve User Record
@@ -261,7 +261,7 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 
-  /api/user/{userId}/meetings:
+  /api/users/{userId}/meetings:
 
     get:
       summary: Retrieve List of Meeting Records for User
@@ -275,7 +275,7 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingInfo"
 
-  /api/meeting:
+  /api/meetings:
 
     post:
       summary: Create Meeting Record
@@ -298,7 +298,7 @@ paths:
           schema:
             $ref: "#/definitions/ActionResponse"
 
-  /api/meeting/{meetingId}:
+  /api/meetings/{meetingId}:
 
     get:
       summary: Retrieve Meeting Record
@@ -361,10 +361,10 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 parameters:
-  roomId:
-    name: roomId
+  roomName:
+    name: roomName
     in: path
-    description: room identifier
+    description: room name
     required: true
     type: string
 
