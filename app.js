@@ -74,7 +74,6 @@ app.post("/meeting", function (req, res) {
         "message": "Bad Request",
         "timestamp": new Date()
       });
-
   }
   else {
       var name = req.body.name || null;
