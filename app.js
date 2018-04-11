@@ -61,49 +61,267 @@ var server = app.listen(port, function () {
 
 //create a meeting
 app.post("/meeting", function (req, res) {
-    var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
-    
+  if(!req.body.name || !req.body.start_datetime || !req.body.room_name ||
+    !req.body.end_datetime || !req.body.participants || 
+    !Array.isArray(req.body.participants) || !(req.body.participants).length) {
 
-    //console.log(req);
-    console.log(req.body);
+      res.statusCode = 400;
+      console.log();
+      res.json({
+        "requestURL":  "/meeting",
+        "action": "post",
+        "status": 400,
+        "message": "Bad Request",
+        "timestamp": new Date()
+      });
+  }
+  else {
+      var name = req.body.name || null;
+      var start_datetime = req.body.start_datetime || null;
+      var end_datetime = req.body.end_datetime || null;
+      var participants = req.body.participants || null;
+      var room_name = req.body.room_name || null;
 
-    var sql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime) VALUES (?, ?, ?);";
-    var inserts = [name, startDateTime, endDateTime];
-    mysql.format(sql, inserts);
+      //TO CHANGE
+      var organizerEmail = participants[0];
+      participants = req.body.participants.slice(1);
 
-    console.log(mysql.format(sql, inserts));
+      //console.log("participants: " + participants);
 
-    pool.query(sql, inserts, function(error, results, fields) {
-        // console.log(results);
-        // console.log(results[0]);
-        // console.log(error);
-        // console.log(fields);
-        if(error) {
-            res.statusCode = 500;
-            console.log(error);
-            res.json({
-              "requestURL":  "/meeting",
-              "action": "post",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
+      pool.getConnection(function(err,connection) {
+        if(err) {
+           console.warn("Failed to get connection from pool");
+           res.statusCode = 500;
+           res.json({
+             "requestURL":  "/meeting",
+             "action": "post",
+             "status": 500,
+             "message": "Failed to getConnection from pool",
+             "timestamp": new Date()
+           });
         }
         else {
-            res.statusCode = 201;
-            res.setHeader("Location", "/meeting/" + results.insertId);
-            res.json({
-              "requestURL":  "/meeting",
-              "action": "post",
-              "status": 201,
-              "message": "Meeting created successfully",
-              "timestamp": new Date()
-            });
-        }
-    });
+          connection.beginTransaction(function(err) {
+            if(err) {
+              console.warn("Transaction failed to start");
+              res.statusCode = 500;
+              res.json({
+                "requestURL":  "/meeting",
+                "action": "post",
+                "status": 500,
+                "message": "Transaction failed to start",
+                "timestamp": new Date()
+              });
+            }
+            else {
 
+              var checkRoomSql = "SELECT * FROM ebdb.MeetingRoom WHERE name = (?);";
+              var checkRoomInserts = [room_name];
+
+              connection.query(checkRoomSql, checkRoomInserts, function(error, results, fields) {
+                if(error) {
+                    return connection.rollback(function() {
+                      res.statusCode = 500;
+                      console.log(error);
+                      res.json({
+                        "requestURL":  "/meeting",
+                        "action": "post",
+                        "status": 500,
+                        "message": "Query failed",
+                        "timestamp": new Date()
+                      });
+                    });
+                }
+                else if(results.length == 0) {
+                  return connection.rollback(function() {
+                    res.statusCode = 404;
+                    console.log(error);
+                    res.json({
+                      "requestURL":  "/meeting",
+                      "action": "post",
+                      "status": 404,
+                      "message": "Meeting room not found",
+                      "timestamp": new Date()
+                    });
+                  });
+                }
+                else if(results.length == 1) {
+                  var organizerSql = "SELECT primary_calendar FROM ebdb.User WHERE email = (?);";
+                  var organizerInserts = [organizerEmail];
+
+                  connection.query(organizerSql, organizerInserts, function(error, results, fields) {
+
+                      if(error) {
+                        return connection.rollback(function() {
+                          res.statusCode = 500;
+                          console.log(error);
+                          res.json({
+                            "requestURL":  "/meeting",
+                            "action": "post",
+                            "status": 500,
+                            "message": "Query failed",
+                            "timestamp": new Date()
+                          });
+                        });
+                      }
+                      else {
+                        var orgMeetingSql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime, calendar, organizing_event, room_name) VALUES (?,?,?,?,?,?);";
+                        var orgMeetingInserts = [name, start_datetime, end_datetime, results[0].primary_calendar, null, room_name];
+
+                        connection.query(orgMeetingSql, orgMeetingInserts, function(error1, results1, fields1) {
+                          if(error1) {
+                              return connection.rollback(function() {
+                                res.statusCode = 500;
+                                console.log(error1);
+                                res.json({
+                                  "requestURL":  "/meeting",
+                                  "action": "post",
+                                  "status": 500,
+                                  "message": "Query failed",
+                                  "timestamp": new Date()
+                                });
+                              });
+                          }
+                          else if(participants.length == 0) {
+                              connection.commit(function(err) {
+                                if(err) {
+                                  return connection.rollback(function() {
+                                    res.statusCode = 500;
+                                    console.log(error1);
+                                    res.json({
+                                      "requestURL":  "/meeting",
+                                      "action": "post",
+                                      "status": 500,
+                                      "message": "Query failed",
+                                      "timestamp": new Date()
+                                    });
+                                  });
+                                }
+                                else {
+                                  res.statusCode = 201;
+                                  res.setHeader("Location", "/meeting/" + results1.insertId);
+                                  res.json({
+                                    "requestURL":  "/meeting",
+                                    "action": "post",
+                                    "status": 201,
+                                    "message": "Meeting created successfully",
+                                    "timestamp": new Date()
+                                  });
+                                }
+                              });
+                          }
+                          else {
+                            var orgEventId = results1.insertId;
+
+                            var participantsSql = "SELECT primary_calendar FROM ebdb.User WHERE email IN (?);";
+                            var participantsInserts = [participants];
+
+                            connection.query(participantsSql, participantsInserts, function(error2, results2, fields2) {
+                              if(error2) {
+                                  return connection.rollback(function() {
+                                    res.statusCode = 500;
+                                    console.log(error1);
+                                    res.json({
+                                      "requestURL":  "/meeting",
+                                      "action": "post",
+                                      "status": 500,
+                                      "message": "Query failed",
+                                      "timestamp": new Date()
+                                    });
+                                  });
+                              }
+                              else {
+
+                               var inserts = [];
+                               var participantFks = results2;
+                                for(var i = 0; i < participantFks.length; i++) {
+                                  inserts.push([name, start_datetime, end_datetime, participantFks[i].primary_calendar, orgEventId, room_name]);
+                                }
+                                console.log(inserts);
+
+                                var sql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime, calendar, organizing_event, room_name) VALUES ?;";
+                                console.log(mysql.format(sql, inserts));
+
+                                //console.log(mysql.format(sql, inserts));
+
+                                connection.query(sql, [inserts], function(error3, results3, fields3) {
+                                    // console.log(results);
+                                    // console.log(results[0]);
+                                    // console.log(error);
+                                    // console.log(fields);
+                                    if(error3) {
+                                        return connection.rollback(function() {
+                                          res.statusCode = 500;
+                                          console.log(error3);
+                                          res.json({
+                                            "requestURL":  "/meeting",
+                                            "action": "post",
+                                            "status": 500,
+                                            "message": "Query failed",
+                                            "timestamp": new Date()
+                                          });
+                                        });
+                                    }
+                                    else {
+                                        connection.commit(function(err) {
+                                          if(err) {
+                                            return connection.rollback(function() {
+                                              res.statusCode = 500;
+                                              console.log(error1);
+                                              res.json({
+                                                "requestURL":  "/meeting",
+                                                "action": "post",
+                                                "status": 500,
+                                                "message": "Queries failed to commit",
+                                                "timestamp": new Date()
+                                              });
+                                            });
+                                          }
+                                          else {
+                                            res.statusCode = 201;
+                                            res.setHeader("Location", "/meeting/" + orgEventId);
+                                            res.json({
+                                              "requestURL":  "/meeting",
+                                              "action": "post",
+                                              "status": 201,
+                                              "message": "Meeting created successfully",
+                                              "timestamp": new Date()
+                                            });
+                                          }
+                                        });
+                                    }
+                                });
+
+                              }
+
+                            });
+
+                          }
+                        });
+                      }
+                  });
+                }
+                else {
+                  return connection.rollback(function() {
+                    res.statusCode = 404;
+                    console.log(error);
+                    res.json({
+                      "requestURL":  "/meeting",
+                      "action": "post",
+                      "status": 404,
+                      "message": "Multiple meeting rooms with that name were found",
+                      "timestamp": new Date()
+                    });
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+      //console.log(req);
+      //console.log(req.body);
 });
 
 
@@ -161,69 +379,210 @@ app.get("/meeting/:meetingId", function (req, res) {
 app.put("/meeting/:meetingId", function (req, res) {
     var meetingId = req.params.meetingId;
     var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
+    var start_datetime = req.body.start_datetime || null;
+    var end_datetime = req.body.end_datetime || null;
+    var room_name = req.body.room_name || null;
 
-    var sql = "UPDATE ebdb.Meeting";
-
-    var setAlreadyFlag = false; //becomes true if one of the fields has been set
-
-    var sqlInserts = {
-        name: name, 
-        startDateTime: startDateTime, 
-        endDateTime: endDateTime
-    };
-
-    //console.log(sqlInserts)
-
-    for(var x in sqlInserts) {
-        if(sqlInserts[x]) {
-            sql += (setAlreadyFlag) ? ", " : " SET ";
-            setAlreadyFlag = true;
-            sql += " " + x + " = " + pool.escape(sqlInserts[x]);
-        }
-    }
-
-    sql += " WHERE id = " + pool.escape(meetingId);
-
-    //console.log(sql);
-
-    pool.query(sql, function(error, results, fields) {
-        //console.log("Results: \n");
-        //console.log(results);
-        if(error) {
-            console.warn("Query failed");
-            res.statusCode = 500;
-            res.json({
-              "requestURL":  "/meeting/" + meetingId,
-              "action": "put",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
+    if(room_name) {
+      pool.getConnection(function(err,connection) {
+        if(err) {
+           console.warn("Failed to get connection from pool");
+           res.statusCode = 500;
+           res.json({
+             "requestURL":  "/meeting",
+             "action": "post",
+             "status": 500,
+             "message": "Failed to getConnection from pool",
+             "timestamp": new Date()
+           });
         }
         else {
-            if(results.affectedRows != 0) {
-              res.statusCode = 200;
+          connection.beginTransaction(function(err) {
+            if(err) {
+              console.warn("Transaction failed to start");
+              res.statusCode = 500;
               res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "put",
-                "status": 200,
-                "message": "Meeting updated successfully",
+                "requestURL":  "/meeting",
+                "action": "post",
+                "status": 500,
+                "message": "Transaction failed to start",
                 "timestamp": new Date()
               });
-            } else { //if (results.affectedRows == 0) {
-              res.statusCode = 404;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "put",
-                "status": 404,
-                "message": "Meeting not found",
-                "timestamp": new Date()
+            }
+            else {
+              var checkRoomSql = "SELECT * FROM ebdb.MeetingRoom WHERE name = (?);";
+              var checkRoomInserts = [room_name];
+
+              connection.query(checkRoomSql, checkRoomInserts, function(error, results, fields) {
+                if(error) {
+                  return connection.rollback(function() {
+                    res.statusCode = 500;
+                    console.log(error);
+                    res.json({
+                      "requestURL":  "/meeting",
+                      "action": "post",
+                      "status": 500,
+                      "message": "Query failed",
+                      "timestamp": new Date()
+                    });
+                  });
+                }
+                else if(results.length == 0) {
+                  return connection.rollback(function() {
+                    res.statusCode = 404;
+                    console.log(error);
+                    res.json({
+                      "requestURL":  "/meeting",
+                      "action": "post",
+                      "status": 404,
+                      "message": "Meeting room not found",
+                      "timestamp": new Date()
+                    });
+                  });
+                }
+                else if(results.length == 1) {
+                  var sql = "UPDATE ebdb.Meeting";
+                  var setAlreadyFlag = false; //becomes true if one of the fields has been set
+
+                  var sqlInserts = {
+                      name: name, 
+                      start_datetime: start_datetime, 
+                      end_datetime: end_datetime,
+                      room_name: room_name
+                  };
+
+                  //console.log(sqlInserts)
+
+                  for(var x in sqlInserts) {
+                      if(sqlInserts[x]) {
+                          sql += (setAlreadyFlag) ? ", " : " SET ";
+                          setAlreadyFlag = true;
+                          sql += " " + x + " = " + pool.escape(sqlInserts[x]);
+                      }
+                  }
+
+                  sql += " WHERE id = " + pool.escape(meetingId);
+
+                  //console.log(sql);
+
+                  pool.query(sql, function(error, results, fields) {
+                      //console.log("Results: \n");
+                      //console.log(results);
+                      if(error) {
+                          console.warn("Query failed");
+                          res.statusCode = 500;
+                          res.json({
+                            "requestURL":  "/meeting/" + meetingId,
+                            "action": "put",
+                            "status": 500,
+                            "message": "Query failed",
+                            "timestamp": new Date()
+                          });
+                      }
+                      else {
+                          if(results.affectedRows != 0) {
+                            res.statusCode = 200;
+                            res.json({
+                              "requestURL":  "/meeting/" + meetingId,
+                              "action": "put",
+                              "status": 200,
+                              "message": "Meeting updated successfully",
+                              "timestamp": new Date()
+                            });
+                          } else { //if (results.affectedRows == 0) {
+                            res.statusCode = 404;
+                            res.json({
+                              "requestURL":  "/meeting/" + meetingId,
+                              "action": "put",
+                              "status": 404,
+                              "message": "Meeting not found",
+                              "timestamp": new Date()
+                            });
+                        }
+                      }
+                  });
+                }
+                else {
+                  return connection.rollback(function() {
+                    res.statusCode = 404;
+                    console.log(error);
+                    res.json({
+                      "requestURL":  "/meeting",
+                      "action": "post",
+                      "status": 404,
+                      "message": "Multiple meeting rooms with that name were found",
+                      "timestamp": new Date()
+                    });
+                  });
+                }
               });
-          }
+            }
+          });
         }
-    });
+      });
+    }
+    else {
+        var sql = "UPDATE ebdb.Meeting";
+
+        var setAlreadyFlag = false; //becomes true if one of the fields has been set
+
+        var sqlInserts = {
+            name: name, 
+            start_datetime: start_datetime, 
+            end_datetime: end_datetime
+        };
+
+        //console.log(sqlInserts)
+
+        for(var x in sqlInserts) {
+            if(sqlInserts[x]) {
+                sql += (setAlreadyFlag) ? ", " : " SET ";
+                setAlreadyFlag = true;
+                sql += " " + x + " = " + pool.escape(sqlInserts[x]);
+            }
+        }
+
+        sql += " WHERE id = " + pool.escape(meetingId);
+
+        //console.log(sql);
+
+        pool.query(sql, function(error, results, fields) {
+            //console.log("Results: \n");
+            //console.log(results);
+            if(error) {
+                console.warn("Query failed");
+                res.statusCode = 500;
+                res.json({
+                  "requestURL":  "/meeting/" + meetingId,
+                  "action": "put",
+                  "status": 500,
+                  "message": "Query failed",
+                  "timestamp": new Date()
+                });
+            }
+            else {
+                if(results.affectedRows != 0) {
+                  res.statusCode = 200;
+                  res.json({
+                    "requestURL":  "/meeting/" + meetingId,
+                    "action": "put",
+                    "status": 200,
+                    "message": "Meeting updated successfully",
+                    "timestamp": new Date()
+                  });
+                } else { //if (results.affectedRows == 0) {
+                  res.statusCode = 404;
+                  res.json({
+                    "requestURL":  "/meeting/" + meetingId,
+                    "action": "put",
+                    "status": 404,
+                    "message": "Meeting not found",
+                    "timestamp": new Date()
+                  });
+              }
+            }
+        });
+    }
 
 
 });
@@ -278,7 +637,7 @@ app.delete("/meeting/:meetingId", function (req, res) {
 //create a user
 app.post("/user", function (req, res) {
 
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+    if(!req.body.email || !req.body.given_name || !req.body.family_name) {
       res.statusCode = 400;
       console.log();
       res.json({
@@ -291,71 +650,121 @@ app.post("/user", function (req, res) {
     }
     else {
       var email = req.body.email || null;
-      var givenName = req.body.givenName || null;
-      var familyName = req.body.familyName || null;
+      var given_name = req.body.given_name || null;
+      var family_name = req.body.family_name || null;
 
-      var calendarName = givenName + "'s Meeting Room Calendar";
+      var calendarName = given_name + "'s Meeting Room Calendar";
       var calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
       var calendarInserts = [calendarName];
 
-     //create calendar for the user
-      pool.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
-        if(error1) {
-            res.statusCode = 500;
-            console.log(error1);
-            res.json({
-              "requestURL":  "/user",
-              "action": "post",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
+       pool.getConnection(function(err,connection) {
+        if(err) {
+           console.warn("Failed to get connection from pool");
+           res.statusCode = 500;
+           res.json({
+             "requestURL":  "/user",
+             "action": "post",
+             "status": 500,
+             "message": "Failed to getConnection from pool",
+             "timestamp": new Date()
+           });
         }
         else {
-            var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar) VALUES (?, ?, ?, ?);";
-
-            //primary_calendar_fk remains null. would have to do an additional nested query to update it.
-
-            var inserts = [email, givenName, familyName, results1.insertId];
-            mysql.format(sql, inserts);
-
-            console.log(mysql.format(sql, inserts));
-
-            //create user w given params
-            pool.query(sql, inserts, function(error, results, fields) {
-                // console.log(results);
-                // console.log(results[0]);
-                // console.log(error);
-                // console.log(fields);
-                if(error) {
-                    res.statusCode = 500;
-                    console.log(error);
-                    res.json({
-                      "requestURL":  "/user",
-                      "action": "post",
-                      "status": 500,
-                      "message": "Query failed",
-                      "timestamp": new Date()
+          connection.beginTransaction(function(err) {
+            if(err) {
+              console.warn("Transaction failed to start");
+              res.statusCode = 500;
+              res.json({
+                "requestURL":  "/user",
+                "action": "post",
+                "status": 500,
+                "message": "Transaction failed to start",
+                "timestamp": new Date()
+              });
+            }
+            else {
+              //create calendar for the user
+              connection.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
+                if(error1) {
+                    return connection.rollback(function() {
+                      res.statusCode = 500;
+                      console.log(error1);
+                      res.json({
+                        "requestURL":  "/user",
+                        "action": "post",
+                        "status": 500,
+                        "message": "Query failed",
+                        "timestamp": new Date()
+                      });
                     });
                 }
                 else {
-                    res.statusCode = 201;
-                    res.setHeader("Location", "/user/" + results.insertId);
-                    res.json({
-                      "requestURL":  "/user",
-                      "action": "post",
-                      "status": 201,
-                      "message": "User created successfully",
-                      "timestamp": new Date()
+                    var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar) VALUES (?, ?, ?, ?);";
+
+                    //primary_calendar remains null. would have to do an additional nested query to update it.
+
+                    var inserts = [email, given_name, family_name, results1.insertId];
+                    mysql.format(sql, inserts);
+
+                    console.log(mysql.format(sql, inserts));
+
+                    //create user w given params
+                    connection.query(sql, inserts, function(error, results, fields) {
+                        // console.log(results);
+                        // console.log(results[0]);
+                        // console.log(error);
+                        // console.log(fields);
+                        if(error) {
+                            return connection.rollback(function() {
+                              res.statusCode = 500;
+                              console.log(error1);
+                              res.json({
+                                "requestURL":  "/user",
+                                "action": "post",
+                                "status": 500,
+                                "message": "Query failed",
+                                "timestamp": new Date()
+                              });
+                            });
+                        }
+                        else {
+                            connection.commit(function(err) {
+                              if(err) {
+                                return connection.rollback(function() {
+                                  res.statusCode = 500;
+                                  console.log(error1);
+                                  res.json({
+                                    "requestURL":  "/user",
+                                    "action": "post",
+                                    "status": 500,
+                                    "message": "Queries failed to commit",
+                                    "timestamp": new Date()
+                                  });
+                                });
+                              }
+                              else {
+                                res.statusCode = 201;
+                                res.setHeader("Location", "/user/" + results.insertId);
+                                res.json({
+                                  "requestURL":  "/user",
+                                  "action": "post",
+                                  "status": 201,
+                                  "message": "User created successfully",
+                                  "timestamp": new Date()
+                                });
+                              }
+                            });
+                            
+                        }
                     });
-                }
-            });
 
+                 }
+              }); 
+            }
+          });
         }
-    }); 
+      });
     }
-
-    
 });
 
 
@@ -412,8 +821,8 @@ app.get("/user/:userId", function (req, res) {
 //update a user
 app.put("/user/:userId", function (req, res) {
     var userId = req.params.userId;
-
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
+  
+    if(!req.body.email || !req.body.given_name || !req.body.family_name) {
       res.statusCode = 400;
       console.log();
       res.json({
@@ -426,8 +835,8 @@ app.put("/user/:userId", function (req, res) {
     }
     else {
       var email = req.body.email || null;
-      var givenName = req.body.givenName || null;
-      var familyName = req.body.familyName || null;
+      var given_name = req.body.given_name || null;
+      var family_name = req.body.family_name || null;
 
       var sql = "UPDATE ebdb.User";
 
@@ -435,8 +844,8 @@ app.put("/user/:userId", function (req, res) {
 
       var sqlInserts = {
           email: email, 
-          given_name: givenName, 
-          family_name: familyName
+          given_name: given_name, 
+          family_name: family_name
       };
 
       //console.log(sqlInserts)
@@ -502,97 +911,152 @@ app.delete("/user/:userId", function (req, res) {
 
     var calendarFkSql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
 
-    pool.query(calendarFkSql, function(error, results, fields) {
-      if(error) {
-          console.warn("Query failed");
-          console.log(error);
-          res.statusCode = 500;
-          res.json({
-            "requestURL":  "/user/" + userId,
-            "action": "delete",
-            "status": 500,
-            "message": "Query failed",
-            "timestamp": new Date()
-          });
-      }
-      else {
-        console.log("Results: " + results[0]);
-        var calendarId = results[0].primary_calendar_fk;
-        console.log("ID: " + calendarId);
-
-        var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
-      
-      //delete User then Calendar
-
-      pool.query(sql, function(error1, results1, fields) {
-          if(error1) {
-              console.warn("User query failed");
-              console.log(error);
+    pool.getConnection(function(err,connection) {
+        if(err) {
+           console.warn("Failed to get connection from pool");
+           res.statusCode = 500;
+           res.json({
+             "requestURL":  "/user",
+             "action": "post",
+             "status": 500,
+             "message": "Failed to getConnection from pool",
+             "timestamp": new Date()
+           });
+        }
+        else {
+          connection.beginTransaction(function(err) {
+            if(err) {
+              console.warn("Transaction failed to start");
               res.statusCode = 500;
               res.json({
-                "requestURL":  "/user/" + userId,
-                "action": "delete",
+                "requestURL":  "/user",
+                "action": "post",
                 "status": 500,
-                "message": "Query failed for User",
+                "message": "Transaction failed to start",
                 "timestamp": new Date()
               });
-          }
-          else {
-              if(results1.affectedRows != 0) {
-                 var calendarSql = "DELETE FROM ebdb.Calendar WHERE id = " + pool.escape(calendarId);
+            }
+            else {
+              connection.query(calendarFkSql, function(error, results, fields) {
+                if(error) {
+                    console.warn("Query failed");
+                    console.log(error);
+                    res.statusCode = 500;
+                    res.json({
+                      "requestURL":  "/user/" + userId,
+                      "action": "delete",
+                      "status": 500,
+                      "message": "Query failed",
+                      "timestamp": new Date()
+                    });
+                }
+                else {
+                  console.log("Results: " + results[0]);
+                  var calendarId = results[0].primary_calendar;
+                  console.log("ID: " + calendarId);
+
+                  var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
                 
-                pool.query(calendarSql, function(error2, results2, fields2) {
-                    if(error2) {
-                        console.warn("Calendar query failed");
-                        console.log(error2);
-                        res.statusCode = 500;
-                        res.json({
-                          "requestURL":  "/user/" + userId,
-                          "action": "delete",
-                          "status": 500,
-                          "message": "Query failed for Calendar",
-                          "timestamp": new Date()
-                        });
-                    }
-                    else {
-                        if(results2.affectedRows != 0) {
-                          res.statusCode = 200;
-                          res.json({
-                            "requestURL":  "/user/" + userId,
-                            "action": "delete",
-                            "status": 200,
-                            "message": "User and their calendar deleted successfully",
-                            "timestamp": new Date()
-                          });
-                        } else { //if (results.affectedRows == 0) {
-                          res.statusCode = 404;
-                          res.json({
-                            "requestURL":  "/user/" + userId,
-                            "action": "delete",
-                            "status": 404,
-                            "message": "Calendar not found",
-                            "timestamp": new Date()
+                  //delete User then Calendar
+
+                  connection.query(sql, function(error1, results1, fields) {
+                      if(error1) {
+                          return connection.rollback(function() {
+                            console.warn("User query failed");
+                            console.log(error);
+                            res.statusCode = 500;
+                            res.json({
+                              "requestURL":  "/user/" + userId,
+                              "action": "delete",
+                              "status": 500,
+                              "message": "Query failed for User",
+                              "timestamp": new Date()
+                            });
                           });
                       }
-                    }
-                });
-              } else { //if (results.affectedRows == 0) {
-                res.statusCode = 404;
-                res.json({
-                  "requestURL":  "/user/" + userId,
-                  "action": "delete",
-                  "status": 404,
-                  "message": "User not found" ,
-                  "timestamp": new Date()
-                });
+                      else {
+                          if(results1.affectedRows != 0) {
+                             var calendarSql = "DELETE FROM ebdb.Calendar WHERE id = " + connection.escape(calendarId);
+                            
+                            connection.query(calendarSql, function(error2, results2, fields2) {
+                                if(error2) {
+                                    return connection.rollback(function() {
+                                      console.warn("Calendar query failed");
+                                      console.log(error2);
+                                      res.statusCode = 500;
+                                      res.json({
+                                        "requestURL":  "/user/" + userId,
+                                        "action": "delete",
+                                        "status": 500,
+                                        "message": "Query failed for Calendar",
+                                        "timestamp": new Date()
+                                      });
+                                    });
+                                }
+                                else {
+                                    if(results2.affectedRows != 0) {
+                                      connection.commit(function(err) {
+                                        if(err) {
+                                          return connection.rollback(function() {
+                                            console.warn("Commit failed");
+                                            console.log(error2);
+                                            res.statusCode = 500;
+                                            res.json({
+                                              "requestURL":  "/user/" + userId,
+                                              "action": "delete",
+                                              "status": 500,
+                                              "message": "Commit failed",
+                                              "timestamp": new Date()
+                                            });
+                                          });
+                                        }
+                                        else {
+                                          res.statusCode = 200;
+                                          res.json({
+                                            "requestURL":  "/user/" + userId,
+                                            "action": "delete",
+                                            "status": 200,
+                                            "message": "User and their calendar deleted successfully",
+                                            "timestamp": new Date()
+                                          });
+                                        }
+                                      });
+                                      
+                                    } else { //if (results.affectedRows == 0) {
+                                      return connection.rollback(function() {
+                                        res.statusCode = 404;
+                                        res.json({
+                                          "requestURL":  "/user/" + userId,
+                                          "action": "delete",
+                                          "status": 404,
+                                          "message": "Calendar not found",
+                                          "timestamp": new Date()
+                                        });
+                                      });
+                                  }
+                                }
+                            });
+                          } else { //if (results.affectedRows == 0) {
+                            return connection.rollback(function() {
+                              res.statusCode = 404;
+                              res.json({
+                                "requestURL":  "/user/" + userId,
+                                "action": "delete",
+                                "status": 404,
+                                "message": "User not found" ,
+                                "timestamp": new Date()
+                              });
+                            });
+                          }
+                      }
+                  });
+                }
+              });
             }
-          }
-      });
-      }
+          });
+        }
     });
 });
-
-
 
 // meeting room endpoints
 
@@ -662,7 +1126,7 @@ app.post("/room", function (req, res) {
                 }
                 else {
                   
-                    var sql = "INSERT INTO ebdb.MeetingRoom (name, calendar_fk) VALUES (?, ?);";
+                    var sql = "INSERT INTO ebdb.MeetingRoom (name, calendar) VALUES (?, ?);";
 
                     var inserts = [name, results.insertId];
                     mysql.format(sql, inserts);
@@ -933,7 +1397,7 @@ app.delete("/room/:roomId", function (req, res) {
               }
               else {
                 console.log("Results: " + results[0]);
-                var calendarId = results[0].calendar_fk;
+                var calendarId = results[0].calendar;
                 console.log("ID: " + calendarId);
 
                 var sql = "DELETE FROM ebdb.MeetingRoom WHERE id = " + pool.escape(roomId);
@@ -1034,7 +1498,6 @@ app.delete("/room/:roomId", function (req, res) {
       }
     });
 });
-
 
 function cleanup() {
     console.log("shutting down");
