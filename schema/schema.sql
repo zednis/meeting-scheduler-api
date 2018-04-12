@@ -46,3 +46,4 @@ CREATE INDEX user_primary_calendar_idx ON User (primary_calendar);
 
 ALTER TABLE Meeting DROP FOREIGN KEY organizing_event_fk;
 ALTER TABLE Meeting DROP INDEX meeting_organizing_event_idx;
+ALTER TABLE Meeting ADD COLUMN room_name VARCHAR(50) NULL;
