@@ -1187,6 +1187,7 @@ app.post("/room", function (req, res) {
 
 //retrieving a meeting room
 app.get("/room/:roomId", function (req, res) {
+
     var roomId = req.params.roomId;
 
     var sql = "SELECT * FROM ebdb.MeetingRoom WHERE id = " + pool.escape(roomId);
@@ -1235,17 +1236,17 @@ app.get("/room/:roomId", function (req, res) {
 });
 
 //retrieving a meeting room
-app.get("/room/:roomName", function (req, res) {
-    var roomName = req.params.roomName;
+app.get("/room/:room_name", function (req, res) {
+    var room_name = req.params.room_name;
 
-    var sql = "SELECT * FROM ebdb.MeetingRoom WHERE name = " + pool.escape(roomName);
+    var sql = "SELECT * FROM ebdb.MeetingRoom WHERE name = " + pool.escape(room_name);
     pool.query(sql, function(error, results, fields) {
         console.log(results);
         if(error) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/room/" + roomName,
+              "requestURL":  "/room/" + room_name,
               "action": "get",
               "status": 500,
               "message": "Query failed",
@@ -1260,7 +1261,7 @@ app.get("/room/:roomName", function (req, res) {
             } else if (results.length == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/room/" + roomName,
+                "requestURL":  "/room/" + room_name,
                 "action": "get",
                 "status": 404,
                 "message": "Meeting room not found",
@@ -1268,10 +1269,10 @@ app.get("/room/:roomName", function (req, res) {
               });
             } else {
               // this should never happen since we are selecting on the primary key
-              console.warn("Multiple Meeting Rooms returned with name: "+ roomName);
+              console.warn("Multiple Meeting Rooms returned with name: "+ room_name);
               res.statusCode = 500;
               res.json({
-                "requestURL":  "/room/" + roomName,
+                "requestURL":  "/room/" + room_name,
                 "action": "get",
                 "status": 500,
                 "message": "Multiple meeting rooms found",
@@ -1281,6 +1282,77 @@ app.get("/room/:roomName", function (req, res) {
         }
 
     });
+});
+
+//retrieving all meetings for a given meeting room
+app.get("/room/:room_name/meetings", function (req, res) {
+    var room_name = req.params.room_name;
+
+
+    var checkRoomSql = "SELECT * FROM ebdb.MeetingRoom WHERE name = (?);";
+    var checkRoomInserts = [room_name];
+
+    pool.query(checkRoomSql, checkRoomInserts, function(error, results, fields) {
+      if(error) {
+          res.statusCode = 500;
+          console.log(error);
+          res.json({
+            "requestURL":  "/room/:room_name/meetings",
+            "action": "get",
+            "status": 500,
+            "message": "Query failed",
+            "timestamp": new Date()
+          });
+      }
+      else if(results.length == 0) {
+        res.statusCode = 404;
+        console.log(error);
+        res.json({
+          "requestURL":  "/room/:room_name/meetings",
+          "action": "get",
+          "status": 404,
+          "message": "Meeting room not found",
+          "timestamp": new Date()
+        });
+      }
+      else if(results.length == 1) {
+
+        var sql = "SELECT * FROM ebdb.Meeting WHERE room_name = " + pool.escape(room_name) + " AND organizing_event IS NULL ORDER BY start_datetime;";
+        console.log(sql);
+        pool.query(sql, function(error, results, fields) {
+            console.log(results);
+            if(error) {
+                console.warn("Query failed1");
+                res.statusCode = 500;
+                res.json({
+                  "requestURL":  "/room/:room_name/meetings",
+                  "action": "get",
+                  "status": 500,
+                  "message": "Query failed",
+                  "timestamp": new Date()
+                });
+            }
+            else {
+                res.statusCode = 200;
+                res.send(results);
+                //not sure if i need to check if results.length == 0
+            }
+
+        });
+      }
+      else {
+        res.statusCode = 404;
+        console.log(error);
+        res.json({
+          "requestURL":  "/room/:room_name/meetings",
+          "action": "get",
+          "status": 404,
+          "message": "Multiple meeting rooms found",
+          "timestamp": new Date()
+        });
+      }
+    });
+
 });
 
 
