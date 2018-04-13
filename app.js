@@ -1184,6 +1184,43 @@ app.post("/api/room", function (req, res) {
 
 });
 
+//retrieving all meeting room records
+app.get("/api/room", function (req, res) {
+
+    var sql = "SELECT * FROM ebdb.MeetingRoom;";
+    pool.query(sql, function(error, results, fields) {
+        console.log(results);
+        if(error) {
+            console.warn("Query failed");
+            res.statusCode = 500;
+            res.json({
+              "requestURL":  "/room/" + roomName,
+              "action": "get",
+              "status": 500,
+              "message": "Query failed",
+              "timestamp": new Date()
+            });
+        }
+        else {
+            if(results.length > 0) {
+              res.statusCode = 200;
+              //console.log(results[0]);
+              res.send(results);
+            } else {//(results.length == 0) {
+              res.statusCode = 404;
+              res.json({
+                "requestURL":  "/room",
+                "action": "get",
+                "status": 404,
+                "message": "No meeting rooms found",
+                "timestamp": new Date()
+              });
+            }
+        }
+
+    });
+});
+
 
 //retrieving a meeting room
 app.get("/api/room/:roomName", function (req, res) {
