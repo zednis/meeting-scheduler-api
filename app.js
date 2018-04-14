@@ -109,10 +109,10 @@ app.get("/api/rooms/:roomName", function (req, res) {
     get(req, res, api.getRoomByName, roomName);
 });
 
-// TODO retrieve a list of meeting rooms, filtered by query parameters
-// app.get("/api/room", function (req, res) {
-// TODO code me
-// });
+//retrieve a list of meeting rooms, filtered by query parameters
+app.get("/api/rooms", function (req, res) {
+    get(req, res, api.getRooms, req.query);
+});
 
 // retrieve a list of meetings for the specified room, filtered by query parameters
 app.get("/api/rooms/:roomName/meetings", function (req, res) {

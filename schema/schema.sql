@@ -25,6 +25,7 @@ CREATE INDEX meeting_calendar_idx on Meeting (calendar);
 CREATE TABLE IF NOT EXISTS MeetingRoom (
 	id INT AUTO_INCREMENT PRIMARY KEY,
 	name VARCHAR(45) NOT NULL UNIQUE,
+	created_at datetime default CURRENT_TIMESTAMP NOT NULL,
 	calendar INT NULL,
 	CONSTRAINT meeting_room_calendar_fk FOREIGN KEY (calendar) REFERENCES Calendar (id) ON DELETE CASCADE
 );
@@ -43,3 +44,18 @@ CREATE TABLE IF NOT EXISTS User (
 );
 
 CREATE INDEX user_primary_calendar_idx ON User (primary_calendar);
+
+CREATE TABLE IF NOT EXISTS RoomResource (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(45) NOT NULL UNIQUE
+);
+
+CREATE TABLE IF NOT EXISTS RoomResourceMeetingRoomAssociation (
+    room INT NOT NULL,
+    resource INT NOT NULL,
+    PRIMARY KEY (room, resource),
+    CONSTRAINT room_resource_meeting_room_association_room_fk FOREIGN KEY (room) REFERENCES MeetingRoom (id) ON DELETE CASCADE,
+    CONSTRAINT room_resource_meeting_room_association_resource_fk FOREIGN KEY (resource) REFERENCES RoomResource (id) ON DELETE CASCADE
+);
+
+ALTER TABLE Meeting ADD COLUMN room_name VARCHAR(50) NULL;

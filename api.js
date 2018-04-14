@@ -15,6 +15,20 @@ exports.cleanUp = function() {
 
 // Meeting operations
 
+const getMeetingObject = function (rows) {
+    const obj = { };
+    // for (let i = 0; i < rows.length; i++) {
+    //     const row = rows[i];
+    //     const meeting = obj.meetings.find(e => {return e.name === row.name});
+    //     if(meeting === undefined) {
+    //         obj.meetings.push({id: row.id, name: row.name, resources: [row.resource_name]});
+    //     } else {
+    //         meeting.resources.push(row.resource_name);
+    //     }
+    // }
+    return obj;
+};
+
 exports.getMeetingById = function (meetingId) {
     const sql = "SELECT * FROM ebdb.Meeting WHERE id = " + db.pool.escape(meetingId);
 
@@ -24,6 +38,7 @@ exports.getMeetingById = function (meetingId) {
                 conn.query(sql)
                     .then(function (results) {
                         if (results.length === 1) {
+                            // const response = getRoomListObject(rows[0]);
                             resolve({status: "FOUND", result: results[0]});
                         } else if (results.length === 0) {
                             resolve({status: "NOT FOUND"});
@@ -120,8 +135,104 @@ exports.deleteMeeting = function (meetingId) {
 
 // Room operations
 
+// exports.getResourcesForRoom = function(roomName) {
+//
+//     let sql = "SELECT RR.name from ebdb.RoomResource AS RR";
+//     sql += "\tJOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA on RR.id = RRMRA.resource";
+//     sql += "\tJOIN ebdb.MeetingRoom MR on RRMRA.room = MR.id";
+//     sql += "\twhere MR.name = " + db.pool.escape(roomName);
+//
+//     return new Promise(function (resolve, reject) {
+//         db.pool.getConnection()
+//             .then(function (conn) {
+//                 conn.query(sql)
+//                     .then(function (results) {
+//                         resolve({status: "OK", value: results});
+//                         conn.release();
+//                     })
+//                     .catch(function (err) {
+//                         console.warn(err);
+//                         reject({status: "FAILURE", error: err});
+//                         conn.release();
+//                     });
+//             });
+//     });
+//
+// };
+
+exports.getRooms = function(parameters) {
+
+    // SELECT ROOM SQL
+
+    let selectSQL = "SELECT DISTINCT MR.id from ebdb.MeetingRoom MR";
+
+    if(parameters.hasOwnProperty("resources")) {
+        selectSQL += "\tJOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA  on RRMRA.room = MR.id";
+        selectSQL += "\tJOIN ebdb.RoomResource RR on RRMRA.resource = RR.id";
+    }
+
+    if(parameters.hasOwnProperty("resources")) {
+        selectSQL += "\tWHERE RR.name = " + db.pool.escape(parameters.resources);
+    }
+
+    // DESCRIBE ROOM SQL
+
+    let describeSQL = "SELECT DISTINCT MR.* from ebdb.MeetingRoom MR";
+    describeSQL += "\tWHERE MR.id in (?)";
+
+    // GET ROOM RESOURCES
+
+    let roomResourcesSQL = "SELECT DISTINCT MR.id, RR.name from ebdb.MeetingRoom MR";
+    roomResourcesSQL += "\tJOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA on RRMRA.room = MR.id";
+    roomResourcesSQL += "\tJOIN ebdb.RoomResource RR on RRMRA.resource = RR.id";
+    roomResourcesSQL += "\tWHERE MR.id in (?)";
+
+    return new Promise(function (resolve, reject) {
+        db.pool.getConnection()
+            .then(function (conn) {
+                conn.query(selectSQL)
+                    .then(function (roomIds) {
+                        if (roomIds.length === 0) {
+                            resolve({status: "NOT FOUND"});
+                        } else {
+                            const response = {meetings: []};
+                            const room_ids = roomIds.map(a => a.id);
+                            for (let i = 0; i < room_ids.length; i++) {
+                                response.meetings.push({id: room_ids[i], resources: []});
+                            }
+                            conn.query(describeSQL, [room_ids])
+                                .then(function (roomDescriptions) {
+                                    for (let i = 0; i < roomDescriptions.length; i++) {
+                                        const roomDescription = roomDescriptions[i];
+                                        const room = response.meetings.find(e => {return e.id === roomDescription.id});
+                                        room.name = roomDescription.name;
+                                    }
+                                    conn.query(roomResourcesSQL, [room_ids])
+                                        .then(function (roomResources) {
+                                            for (let i = 0; i < roomResources.length; i++) {
+                                                const roomResource = roomResources[i];
+                                                const room = response.meetings.find(e => {return e.id === roomResource.id});
+                                                room.resources.push(roomResource.name);
+                                            }
+                                            resolve({status: "FOUND", result: response});
+                                            conn.release();
+                                        });
+                                });
+                        }
+                    })
+                    .catch(function (err) {
+                        console.warn(err);
+                        reject({status: "FAILURE", error: err});
+                        conn.release();
+                    });
+            });
+    });
+
+};
+
 exports.getRoomByName = function (roomName) {
     const sql = "SELECT * FROM ebdb.MeetingRoom WHERE name = " + db.pool.escape(roomName);
+
     return new Promise(function (resolve, reject) {
         db.pool.getConnection()
             .then(function (conn){
@@ -147,28 +258,46 @@ exports.getRoomByName = function (roomName) {
 
 exports.getMeetingsByRoomName = function(roomName) {
 
-    const sql = "SELECT * FROM ebdb.Meeting WHERE calendar in (SELECT calendar from ebdb.MeetingRoom WHERE name = " + db.pool.escape(roomName) + ") ORDER BY start_datetime";
+    let sql = "SELECT * FROM ebdb.Meeting ";
+    sql += "WHERE room_name = " + db.pool.escape(roomName);
+    sql += "\tAND organizing_event IS NULL";
+    sql += "\tORDER BY start_datetime";
 
     return new Promise(function (resolve, reject) {
-        db.pool.getConnection()
-            .then(function (conn){
-                conn.query(sql)
-                    .then(function (results) {
-                        if (results.length === 0) {
-                            resolve({status: "NOT FOUND"});
-                        } else {
-                            const response = {
-                                meetings: results
-                            };
-                            resolve({status: "FOUND", result: response});
-                        }
-                        conn.release();
-                    })
-                    .catch(function (err) {
-                        console.warn(err);
-                        reject({status: "FAILURE", error: err});
-                        conn.release();
-                    });
+
+        // first check that the room exists
+        exports.getRoomByName(roomName)
+            .then(function (result) {
+                if (result.status === "NOT FOUND") {
+                    // room not found
+                    resolve(result);
+                } else {
+
+                    // room found, query for all meetings
+                    db.pool.getConnection()
+                        .then(function (conn){
+                            conn.query(sql)
+                                .then(function (results) {
+                                    if (results.length === 0) {
+                                        resolve({status: "NOT FOUND"});
+                                    } else {
+                                        const response = {
+                                            meetings: results
+                                        };
+                                        resolve({status: "FOUND", result: response});
+                                    }
+                                    conn.release();
+                                })
+                                .catch(function (err) {
+                                    console.warn(err);
+                                    reject({status: "FAILURE", error: err});
+                                    conn.release();
+                                });
+                        });
+                }
+            })
+            .catch(function (err) {
+                reject(err);
             });
     });
 };
