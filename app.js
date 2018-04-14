@@ -177,6 +177,7 @@ function create(req, res, apicall, object ) {
         .catch(function (error) {
             res.statusCode = 500;
             msg.status = 500;
+            msg.error = error.error;
             res.json(msg);
         });
 }

@@ -521,46 +521,68 @@ definitions:
     properties:
       name:
         type: string
+        description: meeting name
       description:
         type: string
       startDateTime:
         type: string
         format: date-time
+        description: meeting start
       endDateTime:
         type: string
         format: date-time
+        description: meeting end
+      participants:
+        type: array
+        description: list of participants, first participant is organizer
+        items:
+          description: user email
+          type: string
+      room:
+        type: string
+        description: room name
     required:
       - name
       - startDateTime
       - endDateTime
+      - participants
 
   MeetingInfo:
     type: object
     properties:
       meetingId:
         type: string
+        description: meeting identifier
       name:
         type: string
+        description: meeting name
       description:
         type: string
       startDateTime:
         type: string
         format: date-time
+        description: meeting start
       endDateTime:
         type: string
         format: date-time
+        description: meeting end
       createdAt:
         type: string
         format: date-time
       participants:
         type: array
+        description: list of participants, first participant is organizer
         items:
-          description: userId
+          description: user email
           type: string
+      room:
+        type: string
+        description: room name
     required:
       - meetingId
       - name
       - participants
+      - room
       - startDateTime
       - endDateTime
       - createdAt

@@ -25,6 +25,10 @@ module.exports.testConnection = new Promise(function(resolve, reject) {
     });
 });
 
+module.exports.formatQuery = function(query, inserts) {
+    return mysql.format(query, inserts);
+};
+
 module.exports.formatDatetime = function(datetime) {
     // remove 'T', milliseconds, and timezone indicator
     return datetime.replace("T", " ").replace(/\.[0-9]*Z/, "");

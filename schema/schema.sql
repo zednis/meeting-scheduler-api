@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS Meeting (
 	calendar INT NOT NULL,
 	organizing_event INT NULL,
 	CONSTRAINT meeting_calendar_fk FOREIGN KEY (calendar) REFERENCES Calendar (id)  ON DELETE CASCADE,
-	CONSTRAINT organizing_event_fk FOREIGN KEY (organizing_event) REFERENCES Calendar (id) ON DELETE CASCADE
+	CONSTRAINT organizing_event_fk FOREIGN KEY (organizing_event) REFERENCES Meeting (id) ON DELETE CASCADE
 );
 
 CREATE INDEX meeting_organizing_event_idx on Meeting (organizing_event);
