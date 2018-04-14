@@ -11,32 +11,34 @@ exports.cleanUp = function() {
     db.cleanUp();
 };
 
+const getError = function(err) {
+    return new Promise(function (resolve, reject) {
+        reject({status: "FAILURE", error: err.message})
+    });
+};
+
+const getOne = function (results) {
+    return new Promise(function (resolve, reject) {
+        if (results.length === 1) {
+            resolve({status: "FOUND", result: results[0]});
+        } else if (results.length === 0) {
+            resolve({status: "NOT FOUND"});
+        } else {
+            reject({status: "FOUND MANY"});
+        }
+    });
+};
+
+
 // Meeting operations
 
 exports.getMeetingById = function (meetingId) {
     const sql = "SELECT * FROM ebdb.Meeting WHERE id = " + db.pool.escape(meetingId);
-
-    return new Promise(function (resolve, reject) {
-        db.pool.getConnection()
-            .then(function (conn){
-                conn.query(sql)
-                    .then(function (results) {
-                        if (results.length === 1) {
-                            resolve({status: "FOUND", result: results[0]});
-                        } else if (results.length === 0) {
-                            resolve({status: "NOT FOUND"});
-                        } else {
-                            reject({status: "FOUND MANY"});
-                        }
-                        conn.release();
-                    })
-                    .catch(function (err) {
-                        console.warn(err);
-                        reject({status: "FAILURE", error: err});
-                        conn.release();
-                    });
-            });
-    });
+    let connection;
+    return db.pool.getConnection()
+        .then(conn => { connection = conn; return conn.query(sql); })
+        .then(results => { return getOne(results)})
+        .finally(() => { if(connection) { connection.release(); }});
 };
 
 exports.createMeeting = function(meeting) {
@@ -283,74 +285,35 @@ exports.getRooms = function(parameters) {
 
 exports.getRoomByName = function (roomName) {
     const sql = "SELECT * FROM ebdb.MeetingRoom WHERE name = " + db.pool.escape(roomName);
+    let connection;
+    return db.pool.getConnection()
+        .then(conn => { connection = conn; return conn.query(sql); })
+        .then(results => { return getOne(results)})
+        .finally(() => { if(connection) { connection.release(); }});
+};
 
+const getMeetingsByRoomResponse = function (results) {
     return new Promise(function (resolve, reject) {
-        db.pool.getConnection()
-            .then(function (conn){
-                conn.query(sql)
-                    .then(function (results) {
-                        if (results.length === 1) {
-                            resolve({status: "FOUND", result: results[0]});
-                        } else if (results.length === 0) {
-                            resolve({status: "NOT FOUND"});
-                        } else {
-                            reject({status: "FOUND MANY"});
-                        }
-                        conn.release();
-                    })
-                    .catch(function (err) {
-                        console.warn(err);
-                        reject({status: "FAILURE", error: err});
-                        conn.release();
-                    });
-            });
+        if (results.length === 0) {
+            resolve({status: "NOT FOUND"});
+        } else {
+            resolve({status: "FOUND", result: { meetings: results}});
+        }
     });
 };
 
-exports.getMeetingsByRoomName = function(roomName) {
-
+exports.getMeetingsByRoomName = function (roomName) {
     let sql = "SELECT * FROM ebdb.Meeting ";
     sql += "WHERE room_name = " + db.pool.escape(roomName);
     sql += "\tAND organizing_event IS NULL";
     sql += "\tORDER BY start_datetime";
 
-    return new Promise(function (resolve, reject) {
-
-        // first check that the room exists
-        exports.getRoomByName(roomName)
-            .then(function (result) {
-                if (result.status === "NOT FOUND") {
-                    // room not found
-                    resolve(result);
-                } else {
-
-                    // room found, query for all meetings
-                    db.pool.getConnection()
-                        .then(function (conn){
-                            conn.query(sql)
-                                .then(function (results) {
-                                    if (results.length === 0) {
-                                        resolve({status: "NOT FOUND"});
-                                    } else {
-                                        const response = {
-                                            meetings: results
-                                        };
-                                        resolve({status: "FOUND", result: response});
-                                    }
-                                    conn.release();
-                                })
-                                .catch(function (err) {
-                                    console.warn(err);
-                                    reject({status: "FAILURE", error: err});
-                                    conn.release();
-                                });
-                        });
-                }
-            })
-            .catch(function (err) {
-                reject(err);
-            });
-    });
+    let connection;
+    return db.pool.getConnection()
+        .then(conn => { connection = conn; return conn.query(sql); })
+        .then(results => { return getMeetingsByRoomResponse(results)})
+        .catch(err => { return getError(err)})
+        .finally(() => { console.log(connection); if(connection) { connection.release(); }});
 };
 
 exports.createRoom = function (room) {
@@ -433,28 +396,6 @@ exports.deleteRoom = function(roomId) {
 };
 
 // User operations
-
-const getMany = function (results) {
-    return new Promise(function (resolve, reject) {
-        if (results.length === 1) {
-            resolve({status: "FOUND", result: results});
-        } else if (results.length === 0) {
-            resolve({status: "NOT FOUND"});
-        }
-    });
-};
-
-const getOne = function (results) {
-    return new Promise(function (resolve, reject) {
-        if (results.length === 1) {
-            resolve({status: "FOUND", result: results[0]});
-        } else if (results.length === 0) {
-            resolve({status: "NOT FOUND"});
-        } else {
-            reject({status: "FOUND MANY"});
-        }
-    });
-};
 
 exports.getUserById = function (userId) {
     const sql = "SELECT * FROM ebdb.User WHERE id = " + db.pool.escape(userId);
