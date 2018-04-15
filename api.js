@@ -403,12 +403,47 @@ exports.deleteRoom = function(roomId) {
 
 // User operations
 
+const getUserResponse = function (result) {
+    return {
+        userId: result.id,
+        givenName: result.given_name || null,
+        familyName: result.family_name || null,
+        email: result.email
+    }
+};
+
+const getOneUser = function (results) {
+    return new Promise(function(resolve, reject) {
+        if (results.length === 0) {
+            resolve({status: "NOT FOUND"});
+        } else if(results.length === 1) {
+            resolve({status: "FOUND", result: getUserResponse(results[0])});
+        } else {
+            reject({status: "FOUND MANY"});
+        }
+    });
+};
+
+const getManyUsers = function (results) {
+    return new Promise(function (resolve, reject) {
+        if (results.length === 0) {
+            resolve({status: "NOT FOUND"});
+        } else {
+            const users = [];
+            for (let i = 0; i < results.length; i++) {
+                users.push(getUserResponse(results[i]));
+            }
+            resolve({status: "FOUND", result: { users: users}});
+        }
+    });
+};
+
 exports.getUserById = function (userId) {
     const sql = "SELECT * FROM ebdb.User WHERE id = " + db.pool.escape(userId);
     let connection;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
-        .then(results => { return getOne(results)})
+        .then(results => { return getOneUser(results)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
@@ -417,29 +452,8 @@ exports.getUserByEmail = function(email) {
     let connection;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
-        .then(results => { return getOne(results)})
+        .then(results => { return getOneUser(results)})
         .finally(() => { if(connection) { connection.release(); }});
-};
-
-const getUsersResponse = function (results) {
-    return new Promise(function (resolve, reject) {
-        if (results.length === 0) {
-            resolve({status: "NOT FOUND"});
-        } else {
-            const users = [];
-            for (let i = 0; i < results.length; i++) {
-                const result = results[i];
-                const user = {
-                    userId: result.id,
-                    givenName: result.given_name || null,
-                    familyName: result.family_name || null,
-                    email: result.email
-                };
-                users.push(user);
-            }
-            resolve({status: "FOUND", result: { users: users}});
-        }
-    });
 };
 
 exports.getUsers = function(parameters) {
@@ -466,7 +480,7 @@ exports.getUsers = function(parameters) {
     let connection;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(selectSQL)})
-        .then(results => { return getUsersResponse(results)})
+        .then(results => { return getManyUsers(results)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
