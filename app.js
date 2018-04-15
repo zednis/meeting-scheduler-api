@@ -60,7 +60,7 @@ var server = app.listen(port, function () {
 //initial meeting endpoints
 
 //create a meeting
-app.post("/meeting", function (req, res) {
+app.post("/api/meeting", function (req, res) {
   if(!req.body.name || !req.body.start_datetime || !req.body.room_name ||
     !req.body.end_datetime || !req.body.participants || 
     !Array.isArray(req.body.participants) || !(req.body.participants).length) {
@@ -326,7 +326,7 @@ app.post("/meeting", function (req, res) {
 
 
 //retrieving a meeting
-app.get("/meeting/:meetingId", function (req, res) {
+app.get("/api/meeting/:meetingId", function (req, res) {
     var meetingId = req.params.meetingId;
 
     var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
@@ -376,7 +376,7 @@ app.get("/meeting/:meetingId", function (req, res) {
 
 
 //update a meeting
-app.put("/meeting/:meetingId", function (req, res) {
+app.put("/api/meeting/:meetingId", function (req, res) {
     var meetingId = req.params.meetingId;
     var name = req.body.name || null;
     var start_datetime = req.body.start_datetime || null;
@@ -589,7 +589,7 @@ app.put("/meeting/:meetingId", function (req, res) {
 
 
 //delete a meeting
-app.delete("/meeting/:meetingId", function (req, res) {
+app.delete("/api/meeting/:meetingId", function (req, res) {
     
     var meetingId = req.params.meetingId;
 
@@ -635,7 +635,7 @@ app.delete("/meeting/:meetingId", function (req, res) {
 
 
 //create a user
-app.post("/user", function (req, res) {
+app.post("/api/user", function (req, res) {
 
     if(!req.body.email || !req.body.given_name || !req.body.family_name) {
       res.statusCode = 400;
@@ -769,7 +769,7 @@ app.post("/user", function (req, res) {
 
 
 //retrieving a user
-app.get("/user/:userId", function (req, res) {
+app.get("/api/user/:userId", function (req, res) {
     var userId = req.params.userId;
 
     var sql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
@@ -819,7 +819,7 @@ app.get("/user/:userId", function (req, res) {
 
 
 //update a user
-app.put("/user/:userId", function (req, res) {
+app.put("/api/user/:userId", function (req, res) {
     var userId = req.params.userId;
   
     if(!req.body.email || !req.body.given_name || !req.body.family_name) {
@@ -904,7 +904,7 @@ app.put("/user/:userId", function (req, res) {
 
 
 //delete a user
-app.delete("/user/:userId", function (req, res) {
+app.delete("/api/user/:userId", function (req, res) {
     
 
     var userId = req.params.userId;
@@ -1061,7 +1061,7 @@ app.delete("/user/:userId", function (req, res) {
 // meeting room endpoints
 
 //create a meeting room
-app.post("/room", function (req, res) {
+app.post("/api/room", function (req, res) {
 
     if(!req.body.name) {
       res.statusCode = 400;
@@ -1184,19 +1184,17 @@ app.post("/room", function (req, res) {
 
 });
 
+//retrieving all meeting room records
+app.get("/api/room", function (req, res) {
 
-//retrieving a meeting room
-app.get("/room/:roomId", function (req, res) {
-    var roomId = req.params.roomId;
-
-    var sql = "SELECT * FROM ebdb.MeetingRoom WHERE id = " + pool.escape(roomId);
+    var sql = "SELECT * FROM ebdb.MeetingRoom;";
     pool.query(sql, function(error, results, fields) {
         console.log(results);
         if(error) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/room/" + roomId,
+              "requestURL":  "/room/" + roomName,
               "action": "get",
               "status": 500,
               "message": "Query failed",
@@ -1204,28 +1202,17 @@ app.get("/room/:roomId", function (req, res) {
             });
         }
         else {
-            if(results.length == 1) {
+            if(results.length > 0) {
               res.statusCode = 200;
               //console.log(results[0]);
-              res.send(results[0]);
-            } else if (results.length == 0) {
+              res.send(results);
+            } else {//(results.length == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/room/" + roomId,
+                "requestURL":  "/room",
                 "action": "get",
                 "status": 404,
-                "message": "Meeting room not found",
-                "timestamp": new Date()
-              });
-            } else {
-              // this should never happen since we are selecting on the primary key
-              console.warn("Multiple Meeting Rooms returned with roomId: "+ roomId);
-              res.statusCode = 500;
-              res.json({
-                "requestURL":  "/room/" + roomId,
-                "action": "get",
-                "status": 500,
-                "message": "Multiple meeting rooms found",
+                "message": "No meeting rooms found",
                 "timestamp": new Date()
               });
             }
@@ -1234,8 +1221,9 @@ app.get("/room/:roomId", function (req, res) {
     });
 });
 
+
 //retrieving a meeting room
-app.get("/room/:roomName", function (req, res) {
+app.get("/api/room/:roomName", function (req, res) {
     var roomName = req.params.roomName;
 
     var sql = "SELECT * FROM ebdb.MeetingRoom WHERE name = " + pool.escape(roomName);
@@ -1268,7 +1256,7 @@ app.get("/room/:roomName", function (req, res) {
               });
             } else {
               // this should never happen since we are selecting on the primary key
-              console.warn("Multiple Meeting Rooms returned with name: "+ roomName);
+              console.warn("Multiple Meeting Rooms returned with name: "+ room_name);
               res.statusCode = 500;
               res.json({
                 "requestURL":  "/room/" + roomName,
@@ -1283,10 +1271,81 @@ app.get("/room/:roomName", function (req, res) {
     });
 });
 
+//retrieving all meetings for a given meeting room
+app.get("/api/room/:roomName/meetings", function (req, res) {
+    var roomName = req.params.roomName;
+
+
+    var checkRoomSql = "SELECT * FROM ebdb.MeetingRoom WHERE name = (?);";
+    var checkRoomInserts = [roomName];
+
+    pool.query(checkRoomSql, checkRoomInserts, function(error, results, fields) {
+      if(error) {
+          res.statusCode = 500;
+          console.log(error);
+          res.json({
+            "requestURL":  "/room/:room_name/meetings",
+            "action": "get",
+            "status": 500,
+            "message": "Query failed",
+            "timestamp": new Date()
+          });
+      }
+      else if(results.length == 0) {
+        res.statusCode = 404;
+        console.log(error);
+        res.json({
+          "requestURL":  "/room/:roomName/meetings",
+          "action": "get",
+          "status": 404,
+          "message": "Meeting room not found",
+          "timestamp": new Date()
+        });
+      }
+      else if(results.length == 1) {
+
+        var sql = "SELECT * FROM ebdb.Meeting WHERE room_name = " + pool.escape(roomName) + " AND organizing_event IS NULL ORDER BY start_datetime;";
+        console.log(sql);
+        pool.query(sql, function(error, results, fields) {
+            console.log(results);
+            if(error) {
+                console.warn("Query failed1");
+                res.statusCode = 500;
+                res.json({
+                  "requestURL":  "/room/:roomName/meetings",
+                  "action": "get",
+                  "status": 500,
+                  "message": "Query failed",
+                  "timestamp": new Date()
+                });
+            }
+            else {
+                res.statusCode = 200;
+                res.send(results);
+                //not sure if i need to check if results.length == 0
+            }
+
+        });
+      }
+      else {
+        res.statusCode = 404;
+        console.log(error);
+        res.json({
+          "requestURL":  "/room/:roomName/meetings",
+          "action": "get",
+          "status": 404,
+          "message": "Multiple meeting rooms found",
+          "timestamp": new Date()
+        });
+      }
+    });
+
+});
+
 
 //update a meeting room
-app.put("/room/:roomId", function (req, res) {
-    var roomId = req.params.roomId;
+app.put("/api/room/:roomName", function (req, res) {
+    var roomName = req.params.roomName;
 
     if(!req.body.name) {
       res.statusCode = 400;
@@ -1300,11 +1359,11 @@ app.put("/room/:roomId", function (req, res) {
       });
     }
 
-    var name = req.body.name || null;
+    var newName = req.body.name || null;
 
-    var sql = "UPDATE ebdb.MeetingRoom SET name = " + pool.escape(name);
+    var sql = "UPDATE ebdb.MeetingRoom SET name = " + pool.escape(newName);
 
-    sql += " WHERE id = " + pool.escape(roomId);
+    sql += " WHERE name = " + pool.escape(roomName);
 
     console.log(sql);
 
@@ -1315,7 +1374,7 @@ app.put("/room/:roomId", function (req, res) {
             console.warn("Query failed");
             res.statusCode = 500;
             res.json({
-              "requestURL":  "/room/" + roomId,
+              "requestURL":  "/room/" + roomName,
               "action": "put",
               "status": 500,
               "message": "Query failed",
@@ -1326,7 +1385,7 @@ app.put("/room/:roomId", function (req, res) {
             if(results.affectedRows != 0) {
               res.statusCode = 200;
               res.json({
-                "requestURL":  "/room/" + roomId,
+                "requestURL":  "/room/" + roomName,
                 "action": "put",
                 "status": 200,
                 "message": "Meeting Room updated successfully",
@@ -1335,7 +1394,7 @@ app.put("/room/:roomId", function (req, res) {
             } else { //if (results.affectedRows == 0) {
               res.statusCode = 404;
               res.json({
-                "requestURL":  "/room/" + roomId,
+                "requestURL":  "/room/" + roomName,
                 "action": "put",
                 "status": 404,
                 "message": "Meeting Room not found",
@@ -1350,11 +1409,11 @@ app.put("/room/:roomId", function (req, res) {
 
 
 //delete a meeting room
-app.delete("/room/:roomId", function (req, res) {
+app.delete("/api/room/:roomName", function (req, res) {
     
-    var roomId = req.params.roomId;
+    var roomName = req.params.roomName;
 
-    var calendarFkSql = "SELECT * FROM ebdb.MeetingRoom WHERE id = " + pool.escape(roomId);
+    var calendarFkSql = "SELECT * FROM ebdb.MeetingRoom WHERE name = " + pool.escape(roomName);
 
     pool.getConnection(function(err, connection) {
       if(err) {
@@ -1387,7 +1446,7 @@ app.delete("/room/:roomId", function (req, res) {
                     console.log(error);
                     res.statusCode = 500;
                     res.json({
-                      "requestURL":  "/room/" + roomId,
+                      "requestURL":  "/room/" + roomName,
                       "action": "delete",
                       "status": 500,
                       "message": "Query failed",
@@ -1400,7 +1459,7 @@ app.delete("/room/:roomId", function (req, res) {
                 var calendarId = results[0].calendar;
                 console.log("ID: " + calendarId);
 
-                var sql = "DELETE FROM ebdb.MeetingRoom WHERE id = " + pool.escape(roomId);
+                var sql = "DELETE FROM ebdb.MeetingRoom WHERE name = " + pool.escape(roomName);
               
               //delete Meeting Room then Calendar
 
@@ -1411,7 +1470,7 @@ app.delete("/room/:roomId", function (req, res) {
                           console.log(error1);
                           res.statusCode = 500;
                           res.json({
-                            "requestURL":  "/room/" + roomId,
+                            "requestURL":  "/room/" + roomName,
                             "action": "delete",
                             "status": 500,
                             "message": "Query failed for meeting room",
@@ -1430,7 +1489,7 @@ app.delete("/room/:roomId", function (req, res) {
                                     console.log(error2);
                                     res.statusCode = 500;
                                     res.json({
-                                      "requestURL":  "/room/" + roomId,
+                                      "requestURL":  "/room/" + roomName,
                                       "action": "delete",
                                       "status": 500,
                                       "message": "Query failed for calendar",
@@ -1444,7 +1503,7 @@ app.delete("/room/:roomId", function (req, res) {
                                     if(err2) {
                                       res.statusCode = 500;
                                       res.json({
-                                        "requestURL":  "/room/" + roomId,
+                                        "requestURL":  "/room/" + roomName,
                                         "action": "delete",
                                         "status": 500,
                                         "message": "Commit failed",
@@ -1454,7 +1513,7 @@ app.delete("/room/:roomId", function (req, res) {
                                     else {
                                       res.statusCode = 200;
                                       res.json({
-                                        "requestURL":  "/room/" + roomId,
+                                        "requestURL":  "/room/" + roomName,
                                         "action": "delete",
                                         "status": 200,
                                         "message": "Meeting Room and their calendar deleted successfully",
@@ -1467,7 +1526,7 @@ app.delete("/room/:roomId", function (req, res) {
                                   return connection.rollback(function() {
                                     res.statusCode = 404;
                                     res.json({
-                                      "requestURL":  "/room/" + roomId,
+                                      "requestURL":  "/room/" + roomName,
                                       "action": "delete",
                                       "status": 404,
                                       "message": "Calendar not found",
@@ -1481,7 +1540,7 @@ app.delete("/room/:roomId", function (req, res) {
                         return connection.rollback(function() {
                           res.statusCode = 404;
                           res.json({
-                            "requestURL":  "/room/" + roomId,
+                            "requestURL":  "/room/" + roomName,
                             "action": "delete",
                             "status": 404,
                             "message": "Meeting Room not found" ,
