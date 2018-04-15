@@ -13,36 +13,117 @@ exports.cleanUp = function() {
 
 const getError = function(err) {
     return new Promise(function (resolve, reject) {
-        reject({status: "FAILURE", error: err.message})
+        reject({status: "FAILURE", message: err.message})
     });
 };
 
-const getMany = function(results) {
+const getMany = function(results, formatter=null) {
     return new Promise(function (resolve, reject) {
-        resolve({status: "OK", value: results});
+        let response = results;
+        if(formatter) {
+            response = [];
+            for (let i = 0; i < results.length; i++) {
+                response.push(formatter(results[i]));
+            }
+        }
+        resolve({status: "OK", value: response});
     });
 };
 
-const getOne = function (results) {
+const getOne = function (results, formatter=null) {
     return new Promise(function (resolve, reject) {
         if (results.length === 1) {
-            resolve({status: "FOUND", result: results[0]});
+            let response = results[0];
+            if(formatter) { response = formatter(response) }
+            resolve({status: "FOUND", result: response});
         } else if (results.length === 0) {
-            resolve({status: "NOT FOUND"});
+            reject({status: "NOT FOUND"});
         } else {
             reject({status: "FOUND MANY"});
         }
     });
 };
 
+const finish = function (object) {
+    return new Promise(function(resolve, reject){ resolve(object)});
+};
+
 // Meeting operations
+
+const meetingFormatter = function(result) {
+
+    console.log("in meetingFormatter");
+    console.log(result);
+
+    return {
+        meetinId: result.id,
+        name: result.name,
+        startDateTime: result.start_datetime,
+        endDateTime: result.end_datetime,
+        createdAt: result.created_at,
+        participants: [],
+        room: result.room_name || null
+    };
+};
+
+const getOrganizerForMeeting = function (conn, meetingId) {
+
+    let sql = "SELECT DISTINCT U.* from ebdb.Meeting M";
+    sql += " JOIN ebdb.Meeting M2 on M2.organizing_event = M.id";
+    sql += " JOIN ebdb.Calendar C on M.calendar = C.id";
+    sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
+    sql += " WHERE M2.id = " + db.pool.escape(meetingId);
+    sql += " UNION";
+    sql += " SELECT DISTINCT U.* from ebdb.Meeting M";
+    sql += " JOIN ebdb.User U On U.primary_calendar = M.calendar";
+    sql += " WHERE M.id = "+ db.pool.escape(meetingId) +" and M.organizing_event IS NULL";
+
+    return conn.query(sql)
+        .then(results => { return getOne(results)})
+        .catch(err => { return getError(err)});
+};
+
+const getParticipantsForMeeting = function(conn, meetingId) {
+
+    let sql = "SELECT DISTINCT U.* from ebdb.Meeting M";
+    sql += " JOIN ebdb.Meeting M2 on M.organizing_event = M2.id";
+    sql += " JOIN ebdb.Meeting M3 on M3.organizing_event = M2.id";
+    sql += " JOIN ebdb.Calendar C on M3.calendar = C.id";
+    sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
+    sql += " WHERE M.id = " + db.pool.escape(meetingId) + " OR M2.id = " + db.pool.escape(meetingId);
+
+    return conn.query(sql)
+        .then(results => { return getMany(results)})
+        .catch(err => { return getError(err)});
+};
+
+const addOrganizerToMeetingResponse = function(meeting, organizer) {
+    return new Promise(function (resolve, reject) {
+        meeting.participants.push(organizer.email);
+        resolve(meeting);
+    });
+};
+
+const addParticipantsToMeetingResponse = function(meeting, participants) {
+    return new Promise(function (resolve, reject) {
+        for(let i = 0; i < participants.length; i++) {
+            meeting.participants.push(participants[i].email);
+        }
+        resolve(meeting);
+    });
+};
 
 exports.getMeetingById = function (meetingId) {
     const sql = "SELECT * FROM ebdb.Meeting WHERE id = " + db.pool.escape(meetingId);
-    let connection;
+    let connection, object;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
-        .then(results => { return getOne(results)})
+        .then(results => { return getOne(results, meetingFormatter)})
+        .then(obj => { object = obj; return getOrganizerForMeeting(connection, [object.result.id])})
+        .then(organizer => { return addOrganizerToMeetingResponse(object.result, organizer.result) })
+        .then(() => { return getParticipantsForMeeting(connection, [object.result.id])})
+        .then(participants => { return addParticipantsToMeetingResponse(object.result, participants.value) })
+        .then(() => { return finish(object); })
         .finally(() => { if(connection) { connection.release(); }});
 };
 
@@ -131,7 +212,7 @@ exports.createMeeting = function(meeting) {
                             });
                     })
                     .catch(err => {
-                        conn.rollback().then(() => { reject({status: "FAILURE", error: err.message}); })
+                        conn.rollback().then(() => { reject({status: "FAILURE", message: err.message}); })
                     });
             })
             .finally(() => {
@@ -196,9 +277,9 @@ exports.deleteMeeting = function (meetingId) {
 const getResourcesForRoomsByRoomId = function(conn, room_ids) {
 
     let sql = "SELECT DISTINCT MR.id, RR.name from ebdb.MeetingRoom MR";
-    sql += "\tJOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA on RRMRA.room = MR.id";
-    sql += "\tJOIN ebdb.RoomResource RR on RRMRA.resource = RR.id";
-    sql += "\tWHERE MR.id in (?)";
+    sql += " JOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA on RRMRA.room = MR.id";
+    sql += " JOIN ebdb.RoomResource RR on RRMRA.resource = RR.id";
+    sql += " WHERE MR.id in (?)";
 
     return conn.query(sql, [room_ids])
         .then(results => { return getMany(results)})
@@ -226,7 +307,7 @@ exports.getRoomByName = function (roomName) {
         .then(results => { return getOne(results)})
         .then(obj => { object = obj; return getResourcesForRoomsByRoomId(connection, [obj.result.id]) })
         .then(roomResources => { return addResourcesToRoom(object.result, roomResources.value)})
-        .then(() => { return new Promise(function(resolve, reject){ resolve(object)} )} )
+        .then(() => { return finish(object); })
         .finally(() => { if(connection) { connection.release(); }});
 };
 
@@ -236,13 +317,35 @@ exports.getRooms = function(parameters) {
 
     let selectSQL = "SELECT DISTINCT MR.id from ebdb.MeetingRoom MR";
 
-    if(parameters.hasOwnProperty("resources")) {
-        selectSQL += "\tJOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA  on RRMRA.room = MR.id";
-        selectSQL += "\tJOIN ebdb.RoomResource RR on RRMRA.resource = RR.id";
-    }
+    const joins = [];
+    const constraints = [];
 
     if(parameters.hasOwnProperty("resources")) {
-        selectSQL += "\tWHERE RR.name = " + db.pool.escape(parameters.resources);
+        joins.push("JOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA  on RRMRA.room = MR.id");
+        joins.push("JOIN ebdb.RoomResource RR on RRMRA.resource = RR.id");
+        constraints.push("RR.name = " + db.pool.escape(parameters.resources));
+    }
+
+    if(parameters.hasOwnProperty("availableFrom") && parameters.hasOwnProperty("availableTo")) {
+
+        const availableFrom = db.pool.escape(db.formatDatetime(parameters.availableFrom));
+        const availableTo = db.pool.escape(db.formatDatetime(parameters.availableTo));
+
+        let sql = "MR.id not in ( SELECT DISTINCT MR.id from ebdb.MeetingRoom MR";
+        sql += " JOIN ebdb.Meeting M on M.room_name = MR.name";
+        sql += " WHERE (M.start_datetime >= "+ availableFrom +" AND M.end_datetime >= "+ availableTo + ")";
+        sql += " OR (M.start_datetime < "+ availableFrom +" AND M.end_datetime > "+ availableFrom +")";
+        sql += " OR (M.start_datetime < "+ availableTo +" AND M.end_datetime > "+ availableTo +"))";
+
+        constraints.push(sql);
+    }
+
+    if(joins.length > 0 ) {
+        selectSQL += " " + joins.join(" ");
+    }
+
+    if(constraints.length > 0) {
+        selectSQL += " WHERE " + constraints.join(" AND ");
     }
 
     // DESCRIBE ROOM SQL
@@ -256,7 +359,7 @@ exports.getRooms = function(parameters) {
                 conn.query(selectSQL)
                     .then(function (roomIds) {
                         if (roomIds.length === 0) {
-                            resolve({status: "NOT FOUND"});
+                            resolve({status: "FOUND", result: { rooms:[] } });
                         } else {
                             const response = {rooms: []};
                             const room_ids = roomIds.map(a => a.id);
@@ -271,7 +374,7 @@ exports.getRooms = function(parameters) {
                                         room.name = roomDescription.name;
                                     }
 
-                                    getResourcesForRoomsByRoomId(room_ids)
+                                    getResourcesForRoomsByRoomId(conn, room_ids)
                                         .then(function (result) {
                                             if (result.status === "OK") {
                                                 const roomResources = result.value;
@@ -300,9 +403,13 @@ exports.getRooms = function(parameters) {
 
 const getMeetingsByRoomResponse = function (results) {
     return new Promise(function (resolve, reject) {
+
+        console.log("in getMeetingsByRoomResponse");
+
         if (results.length === 0) {
             resolve({status: "NOT FOUND"});
         } else {
+            console.log(results);
             resolve({status: "FOUND", result: { meetings: results}});
         }
     });
@@ -319,7 +426,7 @@ exports.getMeetingsByRoomName = function (roomName) {
         .then(conn => { connection = conn; return conn.query(sql); })
         .then(results => { return getMeetingsByRoomResponse(results)})
         .catch(err => { return getError(err)})
-        .finally(() => { console.log(connection); if(connection) { connection.release(); }});
+        .finally(() => { if(connection) { connection.release(); }});
 };
 
 exports.createRoom = function (room) {
@@ -403,7 +510,8 @@ exports.deleteRoom = function(roomId) {
 
 // User operations
 
-const getUserResponse = function (result) {
+const userFormatter = function (result) {
+
     return {
         userId: result.id,
         givenName: result.given_name || null,
@@ -412,38 +520,12 @@ const getUserResponse = function (result) {
     }
 };
 
-const getOneUser = function (results) {
-    return new Promise(function(resolve, reject) {
-        if (results.length === 0) {
-            resolve({status: "NOT FOUND"});
-        } else if(results.length === 1) {
-            resolve({status: "FOUND", result: getUserResponse(results[0])});
-        } else {
-            reject({status: "FOUND MANY"});
-        }
-    });
-};
-
-const getManyUsers = function (results) {
-    return new Promise(function (resolve, reject) {
-        if (results.length === 0) {
-            resolve({status: "NOT FOUND"});
-        } else {
-            const users = [];
-            for (let i = 0; i < results.length; i++) {
-                users.push(getUserResponse(results[i]));
-            }
-            resolve({status: "FOUND", result: { users: users}});
-        }
-    });
-};
-
 exports.getUserById = function (userId) {
     const sql = "SELECT * FROM ebdb.User WHERE id = " + db.pool.escape(userId);
     let connection;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
-        .then(results => { return getOneUser(results)})
+        .then(results => { return getOne(results, userFormatter)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
@@ -452,7 +534,31 @@ exports.getUserByEmail = function(email) {
     let connection;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
-        .then(results => { return getOneUser(results)})
+        .then(results => { return getOne(results, userFormatter())})
+        .finally(() => { if(connection) { connection.release(); }});
+};
+
+const getMeetingsByUserResponse = function(userId, meetings) {
+    return new Promise(function (resolve, reject) {
+        resolve({status: "FOUND", result: { userId: userId, meetings: meetings}});
+    });
+};
+
+exports.getMeetingsByUser = function (userId) {
+
+    let sql = "SELECT M.* FROM ebdb.Meeting M";
+    sql += " JOIN ebdb.Calendar C ON M.calendar = C.id";
+    sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
+    sql += " WHERE U.id = " + db.pool.escape(userId);
+
+    // TODO add participants
+
+    let connection;
+    return db.pool.getConnection()
+        .then(conn => { connection = conn; return conn.query(sql); })
+        .then(results => { return getMany(results, meetingFormatter)})
+        .then(meetings => { return getMeetingsByUserResponse(userId, meetings.value)})
+        .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
@@ -477,10 +583,12 @@ exports.getUsers = function(parameters) {
         selectSQL += " WHERE " + constraints.join(" AND ");
     }
 
+    console.log(db.formatQuery(selectSQL));
+
     let connection;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(selectSQL)})
-        .then(results => { return getManyUsers(results)})
+        .then(results => { return getMany(results, userFormatter)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 

@@ -5,7 +5,7 @@ var pm = require('promise-mysql');
 const Promise = require('promise');
 
 var pool = pm.createPool({
-    connectionLimit: 10,
+    connectionLimit: 20,
     host: process.env.RDS_HOSTNAME || "localhost",
     user: process.env.RDS_USERNAME || "root",
     password: process.env.RDS_PASSWORD || "",

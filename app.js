@@ -75,21 +75,17 @@ app.get("/api/users", function (req, res) {
     get(req, res, api.getUsers, req.query);
 });
 
-// TODO create a meeting on the user's calendar
-// app.post("/api/user/:userId/meetings", function (req, res) {
-// TODO code me
-// });
-
 //retrieving a user
 app.get("/api/users/:userId", function (req, res) {
     const userId = req.params.userId;
     get(req, res, api.getUserById, userId);
 });
 
-//TODO retrieve a user's meetings, filtered by query parameters
-// app.get("/api/user/:userId/meetings", function (req, res) {
-// TODO code me
-// });
+// retrieve a user's meetings, filtered by query parameters
+app.get("/api/users/:userId/meetings", function (req, res) {
+    const userId = req.params.userId;
+    get(req, res, api.getMeetingsByUser, userId)
+});
 
 //update a user
 app.put("/api/users/:userId", function (req, res) {
@@ -183,7 +179,7 @@ function create(req, res, apicall, object ) {
         .catch(function (error) {
             res.statusCode = 500;
             msg.status = 500;
-            msg.error = error.error;
+            msg.error = error.message;
             res.json(msg);
         });
 }
@@ -208,9 +204,17 @@ function get(req, res, apicall, parameter) {
             }
         })
         .catch(function(err) {
-            res.statusCode = 500;
-            msg.status = 500;
-            res.json(msg);
+            if(err.status === "NOT FOUND") {
+                res.statusCode = 404;
+                msg.status = 404;
+                res.json(msg);
+            }
+            else {
+                res.statusCode = 500;
+                msg.status = 500;
+                msg.message = err.message;
+                res.json(msg);
+            }
         });
 }
 
