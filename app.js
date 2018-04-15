@@ -70,6 +70,11 @@ app.post("/api/users", function (req, res) {
     create(req, res, api.createUser, user);
 });
 
+// get a list of users, filtered by query parameters
+app.get("/api/users", function (req, res) {
+    get(req, res, api.getUsers, req.query);
+});
+
 // TODO create a meeting on the user's calendar
 // app.post("/api/user/:userId/meetings", function (req, res) {
 // TODO code me
@@ -103,16 +108,17 @@ app.post("/api/rooms", function (req, res) {
     create(req, res, api.createRoom, req.body);
 });
 
+//retrieve a list of meeting rooms, filtered by query parameters
+app.get("/api/rooms", function (req, res) {
+    get(req, res, api.getRooms, req.query);
+});
+
 //retrieving a meeting room
 app.get("/api/rooms/:roomName", function (req, res) {
     const roomName = req.params.roomName;
     get(req, res, api.getRoomByName, roomName);
 });
 
-//retrieve a list of meeting rooms, filtered by query parameters
-app.get("/api/rooms", function (req, res) {
-    get(req, res, api.getRooms, req.query);
-});
 
 // retrieve a list of meetings for the specified room, filtered by query parameters
 app.get("/api/rooms/:roomName/meetings", function (req, res) {
