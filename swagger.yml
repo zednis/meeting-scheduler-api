@@ -15,7 +15,7 @@ tags:
 - name: Rooms
 paths:
 
-  /api/room:
+  /api/rooms:
 
     post:
       summary: Create Meeting Room Record
@@ -71,7 +71,7 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingRoomInfo"
 
-  /api/room/{roomName}:
+  /api/rooms/{roomName}:
 
     get:
       summary: Retrieve Meeting Room Record
@@ -134,7 +134,7 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 
-  /api/room/{roomName}/meetings:
+  /api/rooms/{roomName}/meetings:
 
     get:
       summary: Retrieve List of Meeting Records for Meeting Room
@@ -148,7 +148,7 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingInfo"
 
-  /api/user:
+  /api/users:
 
     post:
       summary: Create User Record
@@ -198,7 +198,7 @@ paths:
             $ref: "#/definitions/ListOfUserInfo"
 
 
-  /api/user/{userId}:
+  /api/users/{userId}:
 
     get:
       summary: Retrieve User Record
@@ -261,7 +261,7 @@ paths:
             $ref: "#/definitions/ActionResponse"
 
 
-  /api/user/{userId}/meetings:
+  /api/users/{userId}/meetings:
 
     get:
       summary: Retrieve List of Meeting Records for User
@@ -275,7 +275,7 @@ paths:
           schema:
             $ref: "#/definitions/ListOfMeetingInfo"
 
-  /api/meeting:
+  /api/meetings:
 
     post:
       summary: Create Meeting Record
@@ -298,7 +298,7 @@ paths:
           schema:
             $ref: "#/definitions/ActionResponse"
 
-  /api/meeting/{meetingId}:
+  /api/meetings/{meetingId}:
 
     get:
       summary: Retrieve Meeting Record
@@ -364,7 +364,7 @@ parameters:
   roomName:
     name: roomName
     in: path
-    description: room identifier
+    description: room name
     required: true
     type: string
 
@@ -509,7 +509,7 @@ definitions:
   ListOfUserInfo:
     type: object
     properties:
-      users:
+      items:
         type: array
         items:
           $ref: "#/definitions/UserInfo"
@@ -521,46 +521,68 @@ definitions:
     properties:
       name:
         type: string
+        description: meeting name
       description:
         type: string
       startDateTime:
         type: string
         format: date-time
+        description: meeting start
       endDateTime:
         type: string
         format: date-time
+        description: meeting end
+      participants:
+        type: array
+        description: list of participants, first participant is organizer
+        items:
+          description: user email
+          type: string
+      room:
+        type: string
+        description: room name
     required:
       - name
       - startDateTime
       - endDateTime
+      - participants
 
   MeetingInfo:
     type: object
     properties:
       meetingId:
         type: string
+        description: meeting identifier
       name:
         type: string
+        description: meeting name
       description:
         type: string
       startDateTime:
         type: string
         format: date-time
+        description: meeting start
       endDateTime:
         type: string
         format: date-time
+        description: meeting end
       createdAt:
         type: string
         format: date-time
       participants:
         type: array
+        description: list of participants, first participant is organizer
         items:
-          description: userId
+          description: user email
           type: string
+      room:
+        type: string
+        description: room name
     required:
       - meetingId
       - name
       - participants
+      - room
       - startDateTime
       - endDateTime
       - createdAt
@@ -568,7 +590,7 @@ definitions:
   ListOfMeetingInfo:
     type: object
     properties:
-      meetings:
+      items:
         type: array
         items:
           $ref: "#/definitions/MeetingInfo"

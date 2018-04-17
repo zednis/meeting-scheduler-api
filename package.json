@@ -4,10 +4,11 @@
   "private": true,
   "dependencies": {
     "aws-sdk": "latest",
-    "express": "latest",
     "body-parser": "latest",
+    "express": "latest",
     "mysql": "latest",
-    "promise": "latest"
+    "promise": "latest",
+    "promise-mysql": "^3.2.1"
   },
   "scripts": {
     "start": "node app.js",
