@@ -9,7 +9,8 @@
     "fullcalendar": "^3.9.0",
     "jquery": "^3.3.1",
     "mysql": "latest",
-    "promise": "latest"
+    "promise": "latest",
+    "promise-mysql": "^3.2.1"
   },
   "scripts": {
     "start": "node app.js",

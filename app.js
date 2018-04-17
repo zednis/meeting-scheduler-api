@@ -3,7 +3,8 @@ var AWS = require('aws-sdk');
 var express = require('express');
 var bodyParser = require('body-parser');
 var Promise = require('promise');
-var mysql = require('mysql');
+
+var api = require('./api.js');
 
 var path =require("path");
 
@@ -17,6 +18,7 @@ app.use(express.static(__dirname));
 
 var port = process.env.PORT || 3000;
 
+<<<<<<< HEAD
 //sets up a pool of 10 connections to the DB
 var pool = mysql.createPool({
     connectionLimit : 10,
@@ -41,19 +43,21 @@ var pool = mysql.createPool({
 //     });
 // });
 
+=======
+>>>>>>> b550670cdcf22e0afb0fc765236a4dc4d2f634fb
 app.get('/', function (req, res) {
     //res.sendFile(__dirname + "/fullcalendar/demos/default.html");
     //res.json({message: "hello world!"});
     res.redirect('/fullcalendar/demos/selectable.html');
 });
 
-app.get('/dbStatus', function (req, res) {
-    testConnection
-        .then(function(result){
-            var db_status_msg = (result) ? "ok" : "down";
+app.get('/api/dbStatus', function (req, res) {
+    api.testConnection
+        .then(function(result) {
+            const db_status_msg = (result) ? "ok" : "down";
             res.json({databaseConnection: db_status_msg});
         })
-        .catch(function(err){
+        .catch(function(err) {
             res.json({databaseConnection: "error"});
         });
 });
@@ -62,552 +66,214 @@ var server = app.listen(port, function () {
     console.log('Server running at http://127.0.0.1:' + port + '/');
 });
 
-//initial meeting endpoints
-
 //create a meeting
-app.post("/meeting", function (req, res) {
-    var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
-    
-
-    //console.log(req);
+app.post("/api/meetings", function (req, res) {
     console.log(req.body);
-
-    var sql = "INSERT INTO ebdb.Meeting (name, startDateTime, endDateTime) VALUES (?, ?, ?);";
-    var inserts = [name, startDateTime, endDateTime];
-    mysql.format(sql, inserts);
-
-    console.log(mysql.format(sql, inserts));
-
-    pool.query(sql, inserts, function(error, results, fields) {
-        // console.log(results);
-        // console.log(results[0]);
-        // console.log(error);
-        // console.log(fields);
-        if(error) {
-            res.statusCode = 500;
-            console.log(error);
-            res.json({
-              "requestURL":  "/meeting",
-              "action": "post",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            res.statusCode = 201;
-            res.setHeader("Location", "/meeting/" + results.insertId);
-            res.json({
-              "requestURL":  "/meeting",
-              "action": "post",
-              "status": 201,
-              "message": "Meeting created successfully",
-              "timestamp": new Date()
-            });
-        }
-    });
-
+    create(req, res, api.createMeeting, req.body);
 });
 
-
-//retrieving a meeting
-app.get("/meeting/:meetingId", function (req, res) {
-    var meetingId = req.params.meetingId;
-
-    var sql = "SELECT * FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
-    pool.query(sql, function(error, results, fields) {
-        console.log(results);
-        if(error) {
-            console.warn("Query failed");
-            res.statusCode = 500;
-            res.json({
-              "requestURL":  "/meeting/" + meetingId,
-              "action": "get",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            if(results.length == 1) {
-              res.statusCode = 200;
-              //console.log(results[0]);
-              res.send(results[0]);
-            } else if (results.length == 0) {
-              res.statusCode = 404;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "get",
-                "status": 404,
-                "message": "Meeting not found",
-                "timestamp": new Date()
-              });
-            } else {
-              // this should never happen since we are selecting on the primary key
-              console.warn("Multiple meetings returned with meetingId: "+ meetingId);
-              res.statusCode = 500;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "get",
-                "status": 500,
-                "message": "Multiple meetings found",
-                "timestamp": new Date()
-              });
-            }
-        }
-
-    });
+// retrieving a meeting
+app.get("/api/meetings/:meetingId", function (req, res) {
+    const meetingId = req.params.meetingId;
+    get(req, res, api.getMeetingById, meetingId);
 });
 
-
-//update a meeting
-app.put("/meeting/:meetingId", function (req, res) {
-    var meetingId = req.params.meetingId;
-    var name = req.body.name || null;
-    var startDateTime = req.body.startDateTime || null;
-    var endDateTime = req.body.endDateTime || null;
-
-    var sql = "UPDATE ebdb.Meeting";
-
-    var setAlreadyFlag = false; //becomes true if one of the fields has been set
-
-    var sqlInserts = {
-        name: name, 
-        startDateTime: startDateTime, 
-        endDateTime: endDateTime
-    };
-
-    //console.log(sqlInserts)
-
-    for(var x in sqlInserts) {
-        if(sqlInserts[x]) {
-            sql += (setAlreadyFlag) ? ", " : " SET ";
-            setAlreadyFlag = true;
-            sql += " " + x + " = " + pool.escape(sqlInserts[x]);
-        }
-    }
-
-    sql += " WHERE id = " + pool.escape(meetingId);
-
-    //console.log(sql);
-
-    pool.query(sql, function(error, results, fields) {
-        //console.log("Results: \n");
-        //console.log(results);
-        if(error) {
-            console.warn("Query failed");
-            res.statusCode = 500;
-            res.json({
-              "requestURL":  "/meeting/" + meetingId,
-              "action": "put",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            if(results.affectedRows != 0) {
-              res.statusCode = 200;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "put",
-                "status": 200,
-                "message": "Meeting updated successfully",
-                "timestamp": new Date()
-              });
-            } else { //if (results.affectedRows == 0) {
-              res.statusCode = 404;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "put",
-                "status": 404,
-                "message": "Meeting not found",
-                "timestamp": new Date()
-              });
-          }
-        }
-    });
-
-
+// update a meeting
+app.put("/api/meetings/:meetingId", function (req, res) {
+    const obj = { meetingId: req.params.meetingId, body: req.body };
+    update(req, res, api.updateMeeting, obj);
 });
 
-
-//delete a meeting
-app.delete("/meeting/:meetingId", function (req, res) {
-    
-    var meetingId = req.params.meetingId;
-
-    var sql = "DELETE FROM ebdb.Meeting WHERE id = " + pool.escape(meetingId);
-    pool.query(sql, function(error, results, fields) {
-        if(error) {
-            console.warn("Query failed");
-            res.statusCode = 500;
-            res.json({
-              "requestURL":  "/meeting/" + meetingId,
-              "action": "delete",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            if(results.affectedRows != 0) {
-              res.statusCode = 200;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "delete",
-                "status": 200,
-                "message": "Meeting deleted successfully",
-                "timestamp": new Date()
-              });
-            } else { //if (results.affectedRows == 0) {
-              res.statusCode = 404;
-              res.json({
-                "requestURL":  "/meeting/" + meetingId,
-                "action": "delete",
-                "status": 404,
-                "message": "Meeting not found",
-                "timestamp": new Date()
-              });
-          }
-        }
-    });
+// delete a meeting
+app.delete("/api/meetings/:meetingId", function (req, res) {
+    const meetingId = req.params.meetingId;
+    _delete(req, res, api.deleteMeeting, meetingId);
 });
 
-
-//initial user endpoints
-
-
-//create a user
-app.post("/user", function (req, res) {
-
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
-      res.statusCode = 400;
-      console.log();
-      res.json({
-        "requestURL":  "/user",
-        "action": "post",
-        "status": 400,
-        "message": "Bad Request",
-        "timestamp": new Date()
-      });
-    }
-    else {
-      var email = req.body.email || null;
-      var givenName = req.body.givenName || null;
-      var familyName = req.body.familyName || null;
-
-      var calendarName = givenName + "'s Meeting Room Calendar";
-      var calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
-      var calendarInserts = [calendarName];
-
-     //create calendar for the user
-      pool.query(calendarSql, calendarInserts, function(error1, results1, fields1) {
-        if(error1) {
-            res.statusCode = 500;
-            console.log(error1);
-            res.json({
-              "requestURL":  "/user",
-              "action": "post",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            var sql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar_fk) VALUES (?, ?, ?, ?);";
-
-            //primary_calendar_fk remains null. would have to do an additional nested query to update it.
-
-            var inserts = [email, givenName, familyName, results1.insertId];
-            mysql.format(sql, inserts);
-
-            console.log(mysql.format(sql, inserts));
-
-            //create user w given params
-            pool.query(sql, inserts, function(error, results, fields) {
-                // console.log(results);
-                // console.log(results[0]);
-                // console.log(error);
-                // console.log(fields);
-                if(error) {
-                    res.statusCode = 500;
-                    console.log(error);
-                    res.json({
-                      "requestURL":  "/user",
-                      "action": "post",
-                      "status": 500,
-                      "message": "Query failed",
-                      "timestamp": new Date()
-                    });
-                }
-                else {
-                    res.statusCode = 201;
-                    res.setHeader("Location", "/user/" + results.insertId);
-                    res.json({
-                      "requestURL":  "/user",
-                      "action": "post",
-                      "status": 201,
-                      "message": "User created successfully",
-                      "timestamp": new Date()
-                    });
-                }
-            });
-
-        }
-    }); 
-    }
-
-    
+// create a user
+app.post("/api/users", function (req, res) {
+    create(req, res, api.createUser, req.body);
 });
 
+// get a list of users, filtered by query parameters
+app.get("/api/users", function (req, res) {
+    get(req, res, api.getUsers, req.query);
+});
 
 //retrieving a user
-app.get("/user/:userId", function (req, res) {
-    var userId = req.params.userId;
-
-    var sql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
-    pool.query(sql, function(error, results, fields) {
-        console.log(results);
-        if(error) {
-            console.warn("Query failed");
-            res.statusCode = 500;
-            res.json({
-              "requestURL":  "/user/" + userId,
-              "action": "get",
-              "status": 500,
-              "message": "Query failed",
-              "timestamp": new Date()
-            });
-        }
-        else {
-            if(results.length == 1) {
-              res.statusCode = 200;
-              //console.log(results[0]);
-              res.send(results[0]);
-            } else if (results.length == 0) {
-              res.statusCode = 404;
-              res.json({
-                "requestURL":  "/user/" + userId,
-                "action": "get",
-                "status": 404,
-                "message": "User not found",
-                "timestamp": new Date()
-              });
-            } else {
-              // this should never happen since we are selecting on the primary key
-              console.warn("Multiple Users returned with userId: "+ userId);
-              res.statusCode = 500;
-              res.json({
-                "requestURL":  "/user/" + userId,
-                "action": "get",
-                "status": 500,
-                "message": "Multiple users found",
-                "timestamp": new Date()
-              });
-            }
-        }
-
-    });
+app.get("/api/users/:userId", function (req, res) {
+    const userId = req.params.userId;
+    get(req, res, api.getUserById, userId);
 });
 
+// retrieve a user's meetings, filtered by query parameters
+app.get("/api/users/:userId/meetings", function (req, res) {
+    const userId = req.params.userId;
+    get(req, res, api.getMeetingsByUser, userId)
+});
 
 //update a user
-app.put("/user/:userId", function (req, res) {
-    var userId = req.params.userId;
-    
-    if(!req.body.email || !req.body.givenName || !req.body.familyName) {
-      res.statusCode = 400;
-      console.log();
-      res.json({
-        "requestURL":  "/user",
-        "action": "post",
-        "status": 400,
-        "message": "Bad Request",
-        "timestamp": new Date()
-      });
-    }
-    else {
-      var email = req.body.email || null;
-      var givenName = req.body.givenName || null;
-      var familyName = req.body.familyName || null;
-
-      var sql = "UPDATE ebdb.User";
-
-      var setAlreadyFlag = false; //becomes true if one of the fields has been set
-
-      var sqlInserts = {
-          email: email, 
-          given_name: givenName, 
-          family_name: familyName
-      };
-
-      //console.log(sqlInserts)
-
-      for(var x in sqlInserts) {
-          if(sqlInserts[x]) {
-              sql += (setAlreadyFlag) ? ", " : " SET ";
-              setAlreadyFlag = true;
-              sql += " " + x + " = " + pool.escape(sqlInserts[x]);
-          }
-      }
-
-      sql += " WHERE id = " + pool.escape(userId);
-
-      console.log(sql);
-
-      pool.query(sql, function(error, results, fields) {
-          //console.log("Results: \n");
-          //console.log(results);
-          if(error) {
-              console.warn("Query failed");
-              res.statusCode = 500;
-              res.json({
-                "requestURL":  "/user/" + userId,
-                "action": "put",
-                "status": 500,
-                "message": "Query failed",
-                "timestamp": new Date()
-              });
-          }
-          else {
-              if(results.affectedRows != 0) {
-                res.statusCode = 200;
-                res.json({
-                  "requestURL":  "/user/" + userId,
-                  "action": "put",
-                  "status": 200,
-                  "message": "User updated successfully",
-                  "timestamp": new Date()
-                });
-              } else { //if (results.affectedRows == 0) {
-                res.statusCode = 404;
-                res.json({
-                  "requestURL":  "/user/" + userId,
-                  "action": "put",
-                  "status": 404,
-                  "message": "User not found",
-                  "timestamp": new Date()
-                });
-            }
-          }
-      });
-    }
-
+app.put("/api/users/:userId", function (req, res) {
+    const obj = { userId: req.params.userId, body: req.body };
+    update(req, res, api.updateUser, obj);
 });
-
 
 //delete a user
-app.delete("/user/:userId", function (req, res) {
-    
+app.delete("/api/users/:userId", function (req, res) {
+    const userId = req.params.userId;
+    _delete(req, res, api.deleteUser, userId);
+});
 
-    var userId = req.params.userId;
+//create a meeting room
+app.post("/api/rooms", function (req, res) {
+    create(req, res, api.createRoom, req.body);
+});
 
-    var calendarFkSql = "SELECT * FROM ebdb.User WHERE id = " + pool.escape(userId);
+//retrieve a list of meeting rooms, filtered by query parameters
+app.get("/api/rooms", function (req, res) {
+    get(req, res, api.getRooms, req.query);
+});
 
-    pool.query(calendarFkSql, function(error, results, fields) {
-      if(error) {
-          console.warn("Query failed");
-          console.log(error);
-          res.statusCode = 500;
-          res.json({
-            "requestURL":  "/user/" + userId,
-            "action": "delete",
-            "status": 500,
-            "message": "Query failed",
-            "timestamp": new Date()
-          });
-      }
-      else {
-        console.log("Results: " + results[0]);
-        var calendarId = results[0].primary_calendar_fk;
-        console.log("ID: " + calendarId);
-
-        var sql = "DELETE FROM ebdb.User WHERE id = " + pool.escape(userId);
-      
-      //delete User then Calendar
-
-      pool.query(sql, function(error1, results1, fields) {
-          if(error1) {
-              console.warn("User query failed");
-              console.log(error);
-              res.statusCode = 500;
-              res.json({
-                "requestURL":  "/user/" + userId,
-                "action": "delete",
-                "status": 500,
-                "message": "Query failed for User",
-                "timestamp": new Date()
-              });
-          }
-          else {
-              if(results1.affectedRows != 0) {
-                 var calendarSql = "DELETE FROM ebdb.Calendar WHERE id = " + pool.escape(calendarId);
-                
-                pool.query(calendarSql, function(error2, results2, fields2) {
-                    if(error2) {
-                        console.warn("Calendar query failed");
-                        console.log(error2);
-                        res.statusCode = 500;
-                        res.json({
-                          "requestURL":  "/user/" + userId,
-                          "action": "delete",
-                          "status": 500,
-                          "message": "Query failed for Calendar",
-                          "timestamp": new Date()
-                        });
-                    }
-                    else {
-                        if(results2.affectedRows != 0) {
-                          res.statusCode = 200;
-                          res.json({
-                            "requestURL":  "/user/" + userId,
-                            "action": "delete",
-                            "status": 200,
-                            "message": "User and their calendar deleted successfully",
-                            "timestamp": new Date()
-                          });
-                        } else { //if (results.affectedRows == 0) {
-                          res.statusCode = 404;
-                          res.json({
-                            "requestURL":  "/user/" + userId,
-                            "action": "delete",
-                            "status": 404,
-                            "message": "Calendar not found",
-                            "timestamp": new Date()
-                          });
-                      }
-                    }
-                });
-              } else { //if (results.affectedRows == 0) {
-                res.statusCode = 404;
-                res.json({
-                  "requestURL":  "/user/" + userId,
-                  "action": "delete",
-                  "status": 404,
-                  "message": "User not found" ,
-                  "timestamp": new Date()
-                });
-            }
-          }
-      });
-      }
-    });
+//retrieving a meeting room
+app.get("/api/rooms/:roomName", function (req, res) {
+    const roomName = req.params.roomName;
+    get(req, res, api.getRoomByName, roomName);
 });
 
 
+// retrieve a list of meetings for the specified room, filtered by query parameters
+app.get("/api/rooms/:roomName/meetings", function (req, res) {
+    const roomName = req.params.roomName;
+    get(req, res, api.getMeetingsByRoomName, roomName);
+});
 
+//update a meeting room
+app.put("/api/rooms/:roomName", function (req, res) {
+    const obj = { roomId: req.params.roomName, body: req.body };
+    update(req, res, api.updateRoom, obj);
+});
 
+//delete a meeting room
+app.delete("/api/rooms/:roomName", function (req, res) {
+   _delete(req, res, api.deleteRoom, req.params.roomName);
+});
 
+function _delete(req, res, apicall, parameter) {
 
+    const msg = {
+        requestURL: req.originalUrl,
+        action: req.method,
+        timestamp: new Date()
+    };
+
+    apicall(parameter)
+        .then(function(result) {
+            if(result.itemsDeleted === 0) {
+                res.statusCode = 404;
+                msg.status = 404;
+                res.send(msg);
+            } else {
+                res.statusCode = 200;
+                msg.status = 200;
+                res.send(msg);
+            }
+        })
+        .catch(function(err) {
+            res.statusCode = 500;
+            msg.status = 500;
+            res.send(msg);
+        });
+}
+
+function create(req, res, apicall, object ) {
+
+    const msg = {
+        requestURL: req.originalUrl,
+        action: req.method,
+        timestamp: new Date()
+    };
+
+    apicall(object)
+        .then(function (result) {
+            res.statusCode = 201;
+            res.setHeader("Location", req.originalUrl + "/" + encodeURIComponent(result.createdId));
+            msg.status = 201;
+            msg.created = req.originalUrl + "/" + encodeURIComponent(result.createdId);
+            res.send(msg);
+        })
+        .catch(function (error) {
+            res.statusCode = 500;
+            msg.status = 500;
+            msg.error = error.message;
+            res.json(msg);
+        });
+}
+
+function get(req, res, apicall, parameter) {
+
+    const msg = {
+        requestURL: req.originalUrl,
+        action: req.method,
+        timestamp: new Date()
+    };
+
+    apicall(parameter)
+        .then(function(result) {
+            if(result.status === "OK") {
+                res.statusCode = 200;
+                res.send(result.value);
+            } else if (result.status === "NOT FOUND") {
+                res.statusCode = 404;
+                msg.status = 404;
+                res.json(msg);
+            }
+        })
+        .catch(function(err) {
+            if(err.status === "NOT FOUND") {
+                res.statusCode = 404;
+                msg.status = 404;
+                res.json(msg);
+            }
+            else {
+                res.statusCode = 500;
+                msg.status = 500;
+                msg.message = err.message;
+                res.json(msg);
+            }
+        });
+}
+
+function update(req, res, apicall, object) {
+
+    const msg = {
+        requestURL: req.originalUrl,
+        action: req.method,
+        timestamp: new Date()
+    };
+
+    apicall(object)
+        .then(function (result) {
+            if(result.itemsUpdated === 0) {
+                res.statusCode = 404;
+                msg.status = 404;
+                res.send(msg);
+            } else {
+                res.statusCode = 200;
+                msg.status = 200;
+                res.send(msg);
+            }
+        })
+        .catch(function (error) {
+            res.statusCode = 500;
+            msg.status = 500;
+            res.json(msg);
+        });
+}
 
 function cleanup() {
     console.log("shutting down");
     server.close(function () {
-       pool.end();
-       console.log("closed database connection pool");
+        api.cleanUp();
     });
 }
 

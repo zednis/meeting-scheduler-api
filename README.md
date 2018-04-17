@@ -1,1 +1,1 @@
-# meeting-scheduler-api
+# meeting-scheduler-api <img src="https://raw.githubusercontent.com/zednis/meeting-scheduler-api/master/swagger.yml">
