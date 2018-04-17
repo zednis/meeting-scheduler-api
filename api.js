@@ -44,6 +44,11 @@ const getOne = function (results, formatter=null) {
     });
 };
 
+const getCreated = function (results, createdId=null) {
+    const foo = (createdId) ? createdId : results.insertId;
+    return new Promise(function (resolve, reject) { resolve({status: "SUCCESS", createdId: foo}); });
+};
+
 const finish = function (object) {
     return new Promise(function(resolve, reject){ resolve(object); });
 };
@@ -366,9 +371,6 @@ exports.getRooms = function(parameters) {
 
 const getMeetingsByRoomResponse = function (results) {
     return new Promise(function (resolve, reject) {
-
-        console.log("in getMeetingsByRoomResponse");
-
         if (results.length === 0) {
             resolve({status: "NOT FOUND"});
         } else {
@@ -395,33 +397,26 @@ exports.getMeetingsByRoomName = function (roomName) {
 exports.createRoom = function (room) {
 
     const calendarName = room.name + "'s Meeting Room Calendar" || "";
+
     const calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
+
     const roomSql = "INSERT INTO ebdb.MeetingRoom (name, calendar) VALUES (?, ?);";
 
-    return new Promise(function (resolve, reject) {
-        db.pool.getConnection()
-            .then(function (conn) {
-                conn.query(calendarSql, [calendarName])
-                    .then(function (results) {
-                        const inserts = [room.name, results.insertId];
-                        conn.query(roomSql, inserts)
-                            .then(function (results) {
-                                resolve({status: "SUCCESS", createdId: room.name});
-                                conn.release();
-                            })
-                            .catch(function (err) {
-                                console.warn(err);
-                                reject({status: "FAILURE", error: err});
-                                conn.release();
-                            });
-                    })
-                    .catch(function (err) {
-                        console.warn(err);
-                        reject({status: "FAILURE", error: err});
-                        conn.release();
-                    });
-            });
-    });
+    const addRoomResourceSql = "INSERT IGNORE INTO ebdb.RoomResource (name) VALUES (?)";
+
+    let associationResouresSql = "INSERT IGNORE INTO ebdb.RoomResourceMeetingRoomAssociation (room, resource)";
+    associationResouresSql += " SELECT ?, id FROM ebdb.RoomResource WHERE name in (?);";
+
+    let connection, object, roomResults;
+    return db.pool.getConnection()
+        .then(conn => {connection = conn; return conn.query(calendarSql, [calendarName])})
+        .then(calendarResults => { return connection.query(roomSql, [room.name, calendarResults.insertId])})
+        .then(r => { roomResults = r; return getCreated(r, room.name); })
+        .then(obj => { object = obj; return connection.query(addRoomResourceSql, room.resources)})
+        .then((r) => { return connection.query(associationResouresSql,[roomResults.insertId, room.resources])})
+        .then((r) => { return finish(object)})
+        .catch(err => { return getError(err) })
+        .finally(() => { if(connection) { connection.release(); }});
 };
 
 exports.updateRoom = function(obj) {
