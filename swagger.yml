@@ -509,7 +509,7 @@ definitions:
   ListOfUserInfo:
     type: object
     properties:
-      users:
+      items:
         type: array
         items:
           $ref: "#/definitions/UserInfo"
@@ -590,7 +590,7 @@ definitions:
   ListOfMeetingInfo:
     type: object
     properties:
-      meetings:
+      items:
         type: array
         items:
           $ref: "#/definitions/MeetingInfo"

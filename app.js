@@ -60,14 +60,7 @@ app.delete("/api/meetings/:meetingId", function (req, res) {
 
 // create a user
 app.post("/api/users", function (req, res) {
-    // TODO verify req body and return status 400 if not valid
-    const user = {
-        email: req.body.email || null,
-        givenName: req.body.givenName || null,
-        familyName: req.body.familyName || null,
-        calendarName: req.body.givenName + "'s Meeting Room Calendar" || null
-    };
-    create(req, res, api.createUser, user);
+    create(req, res, api.createUser, req.body);
 });
 
 // get a list of users, filtered by query parameters
@@ -194,9 +187,9 @@ function get(req, res, apicall, parameter) {
 
     apicall(parameter)
         .then(function(result) {
-            if(result.status === "FOUND") {
+            if(result.status === "OK") {
                 res.statusCode = 200;
-                res.send(result.result);
+                res.send(result.value);
             } else if (result.status === "NOT FOUND") {
                 res.statusCode = 404;
                 msg.status = 404;

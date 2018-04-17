@@ -26,7 +26,7 @@ const getMany = function(results, formatter=null) {
                 response.push(formatter(results[i]));
             }
         }
-        resolve({status: "OK", value: response});
+        resolve({status: "OK", value: {items: response}});
     });
 };
 
@@ -35,7 +35,7 @@ const getOne = function (results, formatter=null) {
         if (results.length === 1) {
             let response = results[0];
             if(formatter) { response = formatter(response) }
-            resolve({status: "FOUND", result: response});
+            resolve({status: "OK", value: response});
         } else if (results.length === 0) {
             reject({status: "NOT FOUND"});
         } else {
@@ -45,18 +45,15 @@ const getOne = function (results, formatter=null) {
 };
 
 const finish = function (object) {
-    return new Promise(function(resolve, reject){ resolve(object)});
+    return new Promise(function(resolve, reject){ resolve(object); });
 };
 
 // Meeting operations
 
 const meetingFormatter = function(result) {
 
-    console.log("in meetingFormatter");
-    console.log(result);
-
     return {
-        meetinId: result.id,
+        meetingId: result.id,
         name: result.name,
         startDateTime: result.start_datetime,
         endDateTime: result.end_datetime,
@@ -119,16 +116,15 @@ exports.getMeetingById = function (meetingId) {
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
         .then(results => { return getOne(results, meetingFormatter)})
-        .then(obj => { object = obj; return getOrganizerForMeeting(connection, [object.result.id])})
-        .then(organizer => { return addOrganizerToMeetingResponse(object.result, organizer.result) })
-        .then(() => { return getParticipantsForMeeting(connection, [object.result.id])})
-        .then(participants => { return addParticipantsToMeetingResponse(object.result, participants.value) })
+        .then(obj => { object = obj; return getOrganizerForMeeting(connection, [object.value.id])})
+        .then(organizer => { return addOrganizerToMeetingResponse(object.value, organizer.value) })
+        .then(() => { return getParticipantsForMeeting(connection, [object.value.id])})
+        .then(participants => { return addParticipantsToMeetingResponse(object.value, participants.value) })
         .then(() => { return finish(object); })
         .finally(() => { if(connection) { connection.release(); }});
 };
 
 exports.createMeeting = function(meeting) {
-
     const getRoomSQL = "SELECT * FROM ebdb.MeetingRoom WHERE name = (?);";
     const getUsersByEmailSql = "SELECT * FROM ebdb.User where email in (?);";
     const createMeetingSql = "INSERT INTO ebdb.Meeting (name, start_datetime, end_datetime, calendar, organizing_event, room_name) VALUES (?,?,?,?,?,?);";
@@ -283,17 +279,19 @@ const getResourcesForRoomsByRoomId = function(conn, room_ids) {
 
     return conn.query(sql, [room_ids])
         .then(results => { return getMany(results)})
-        .catch(err => { return getError(err)});
+        .catch(err => { return getError(err.message)});
 };
 
-const addResourcesToRoom = function (room, roomResources) {
+const addResourcesToRooms = function(rooms, roomResources) {
     return new Promise(function (resolve, reject) {
-        room.resources = [];
-        for (let i = 0; i < roomResources.length; i++) {
-            const roomResource = roomResources[i];
-            room.resources.push(roomResource.name);
+        for(let i = 0; i < rooms.length; i++) {
+            for(let j = 0; j < roomResources.length; j++) {
+                if(roomResources[j].id === rooms[i].roomId) {
+                    rooms[i].resources.push(roomResources[j].name);
+                }
+            }
         }
-        resolve(room);
+        resolve(rooms);
     });
 };
 
@@ -304,18 +302,25 @@ exports.getRoomByName = function (roomName) {
 
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
-        .then(results => { return getOne(results)})
-        .then(obj => { object = obj; return getResourcesForRoomsByRoomId(connection, [obj.result.id]) })
-        .then(roomResources => { return addResourcesToRoom(object.result, roomResources.value)})
+        .then(results => { return getOne(results, roomFormatter)})
+        .then(obj => { object = obj; return getResourcesForRoomsByRoomId(connection, [obj.value.roomId]) })
+        .then(roomResources => { return addResourcesToRooms([object.value], roomResources.value.items)})
         .then(() => { return finish(object); })
+        .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
+};
+
+const roomFormatter = function (result) {
+    return {
+        roomId: result.id,
+        name: result.name || null,
+        resources: []
+    }
 };
 
 exports.getRooms = function(parameters) {
 
-    // SELECT ROOM SQL
-
-    let selectSQL = "SELECT DISTINCT MR.id from ebdb.MeetingRoom MR";
+    let selectSQL = "SELECT DISTINCT MR.* from ebdb.MeetingRoom MR";
 
     const joins = [];
     const constraints = [];
@@ -348,57 +353,15 @@ exports.getRooms = function(parameters) {
         selectSQL += " WHERE " + constraints.join(" AND ");
     }
 
-    // DESCRIBE ROOM SQL
-
-    let describeSQL = "SELECT DISTINCT MR.* from ebdb.MeetingRoom MR";
-    describeSQL += "\tWHERE MR.id in (?)";
-
-    return new Promise(function (resolve, reject) {
-        db.pool.getConnection()
-            .then(function (conn) {
-                conn.query(selectSQL)
-                    .then(function (roomIds) {
-                        if (roomIds.length === 0) {
-                            resolve({status: "FOUND", result: { rooms:[] } });
-                        } else {
-                            const response = {rooms: []};
-                            const room_ids = roomIds.map(a => a.id);
-                            for (let i = 0; i < room_ids.length; i++) {
-                                response.rooms.push({id: room_ids[i], resources: []});
-                            }
-                            conn.query(describeSQL, [room_ids])
-                                .then(function (roomDescriptions) {
-                                    for (let i = 0; i < roomDescriptions.length; i++) {
-                                        const roomDescription = roomDescriptions[i];
-                                        const room = response.rooms.find(e => {return e.id === roomDescription.id});
-                                        room.name = roomDescription.name;
-                                    }
-
-                                    getResourcesForRoomsByRoomId(conn, room_ids)
-                                        .then(function (result) {
-                                            if (result.status === "OK") {
-                                                const roomResources = result.value;
-                                                for (let i = 0; i < roomResources.length; i++) {
-                                                    const roomResource = roomResources[i];
-                                                    const room = response.rooms.find(e => {return e.id === roomResource.id});
-                                                    room.resources.push(roomResource.name);
-                                                }
-                                                resolve({status: "FOUND", result: response});
-                                            }
-                                        });
-                                });
-                        }
-                    })
-                    .catch(function (err) {
-                        console.warn(err);
-                        reject({status: "FAILURE", error: err});
-                    })
-                    .finally(() => {
-                        if(conn) { conn.release(); }
-                    });
-            });
-    });
-
+    let connection, object;
+    return db.pool.getConnection()
+        .then(conn => {connection = conn; return conn.query(selectSQL)})
+        .then(results => { return getMany(results, roomFormatter)})
+        .then(obj => { object = obj; return getResourcesForRoomsByRoomId(connection, obj.value.items.map(r => r.roomId))})
+        .then(roomResources => { return addResourcesToRooms(object.value.items, roomResources.value.items) })
+        .then(() => { return finish(object); })
+        .catch((err) => { return getError(err)})
+        .finally(() => { if(connection) { connection.release(); }});
 };
 
 const getMeetingsByRoomResponse = function (results) {
@@ -410,7 +373,7 @@ const getMeetingsByRoomResponse = function (results) {
             resolve({status: "NOT FOUND"});
         } else {
             console.log(results);
-            resolve({status: "FOUND", result: { meetings: results}});
+            resolve({status: "OK", result: { meetings: results}});
         }
     });
 };
@@ -425,7 +388,7 @@ exports.getMeetingsByRoomName = function (roomName) {
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
         .then(results => { return getMeetingsByRoomResponse(results)})
-        .catch(err => { return getError(err)})
+        .catch(err => { return getError(err.message)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
@@ -538,10 +501,61 @@ exports.getUserByEmail = function(email) {
         .finally(() => { if(connection) { connection.release(); }});
 };
 
-const getMeetingsByUserResponse = function(userId, meetings) {
+const meetingsByUserFormatter = function(userId, meetings) {
     return new Promise(function (resolve, reject) {
-        resolve({status: "FOUND", result: { userId: userId, meetings: meetings}});
+        resolve({status: "OK", value: { userId: userId, meetings: meetings}});
     });
+};
+
+const getOrganizersForMeetings = function (conn, meetings) {
+
+    let sql = "SELECT DISTINCT U.id as userId, U.email , M2.id as meetingId from ebdb.Meeting M";
+    sql += " JOIN ebdb.Meeting M2 on M2.organizing_event = M.id";
+    sql += " JOIN ebdb.Calendar C on M.calendar = C.id";
+    sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
+    sql += " WHERE M2.id in (?)";
+    sql += " UNION";
+    sql += " SELECT DISTINCT U.id as userId, U.email, M.id as meetingId from ebdb.Meeting M";
+    sql += " JOIN ebdb.User U On U.primary_calendar = M.calendar";
+    sql += " WHERE M.id in (?) and M.organizing_event IS NULL";
+
+    return conn.query(sql, [meetings.map(m => m.meetingId), meetings.map(m => m.meetingId)])
+        .then(results => { return getMany(results)})
+        .catch(err => { return getError(err)});
+};
+
+const addUsersToMeetings = function(meetings, userMap) {
+    return new Promise(function (resolve, reject) {
+        for(let i = 0; i < userMap.length; i++) {
+            const meeting = meetings.find(m => m.meetingId === userMap[i].meetingId);
+            const userEmail = userMap[i].email || null;
+            if(userEmail && meeting) {
+                meeting.participants.push(userEmail);
+            }
+        }
+        resolve(meetings);
+    });
+};
+
+const getParticipantsForMeetings = function(conn, meetings) {
+
+    let sql = "SELECT DISTINCT U.id as userId, U.email, M.id as meetingId from ebdb.Meeting M";
+    sql += " JOIN ebdb.Meeting M2 on M.organizing_event = M2.id";
+    sql += " JOIN ebdb.Meeting M3 on M3.organizing_event = M2.id";
+    sql += " JOIN ebdb.Calendar C on M3.calendar = C.id";
+    sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
+    sql += " WHERE M.id in (?)";
+    sql += " UNION";
+    sql += " SELECT DISTINCT U.id as userId, U.email, M2.id as meetingId from ebdb.Meeting M";
+    sql += " JOIN ebdb.Meeting M2 on M.organizing_event = M2.id";
+    sql += " JOIN ebdb.Meeting M3 on M3.organizing_event = M2.id";
+    sql += " JOIN ebdb.Calendar C on M3.calendar = C.id";
+    sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
+    sql += " WHERE M2.id in (?)";
+
+    return conn.query(sql, [meetings.map(m => m.meetingId), meetings.map(m => m.meetingId)])
+        .then(results => { return getMany(results)})
+        .catch(err => { return getError(err)});
 };
 
 exports.getMeetingsByUser = function (userId) {
@@ -551,13 +565,16 @@ exports.getMeetingsByUser = function (userId) {
     sql += " JOIN ebdb.User U on C.id = U.primary_calendar";
     sql += " WHERE U.id = " + db.pool.escape(userId);
 
-    // TODO add participants
-
-    let connection;
+    let connection, object;
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(sql); })
         .then(results => { return getMany(results, meetingFormatter)})
-        .then(meetings => { return getMeetingsByUserResponse(userId, meetings.value)})
+        .then(obj => { object = obj; return getOrganizersForMeetings(connection, obj.value.items)})
+        .then(results => { return addUsersToMeetings(object.value.items, results.value.items)})
+        .then(() => { return getParticipantsForMeetings(connection, object.value.items)})
+        .then((results) => { return addUsersToMeetings(object.value.items, results.value.items)})
+        .then(() => { return meetingsByUserFormatter(userId, object.value.items)})
+        .then(obj => { return finish(obj); })
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
 };
@@ -589,10 +606,18 @@ exports.getUsers = function(parameters) {
     return db.pool.getConnection()
         .then(conn => { connection = conn; return conn.query(selectSQL)})
         .then(results => { return getMany(results, userFormatter)})
+        .then(users => { return finish(users); })
         .finally(() => { if(connection) { connection.release(); }});
 };
 
-exports.createUser = function (user) {
+exports.createUser = function (request) {
+
+    const user = {
+        email: request.email || null,
+        givenName: request.givenName || null,
+        familyName: request.familyName || null,
+        calendarName: request.givenName + "'s Meeting Room Calendar" || null
+    };
 
     const calendarName = user.email + "'s Calendar" || "";
     const calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
