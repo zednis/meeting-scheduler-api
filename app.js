@@ -1522,8 +1522,8 @@ app.post("/api/meetingSuggestion", function (req, res) {
       var participants = req.body.participants || null;
 
       //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
-      var getMeetingSql = "SELECT start_datetime, end_datetime FROM ebdb.meeting WHERE " //Where end_datetime < ADDDATE(CURDATE(), 4) AND"
-                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?));";
+      var getMeetingSql = "SELECT DISTINCT(start_datetime), end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime < ADDDATE(CURDATE(), 4) AND "
+                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
       var inserts = [participants];
 
       pool.query(getMeetingSql, inserts, function(error, results, fields) {
@@ -1542,94 +1542,14 @@ app.post("/api/meetingSuggestion", function (req, res) {
           
           var meetings = results;
 
-          //construct time table
-          var currDate = new Date();
-          //console.log(currDate.toISOString());
+          var parameters = {
+            meetings: meetings,
+            numDaysAhead: req.body.numDaysAhead,
+            startTime: req.body.startTime,
+            endTime: req.body.endTime
+          };
 
-          var currHour = currDate.getHours();
-
-          var currMin = currDate.getMinutes();
-
-          currDate.setSeconds(0);
-          currDate.setMilliseconds(0);
-
-          //round up to the nearest 30 min
-          if(currMin > 30) {
-            currMin = 0;
-            currHour++;
-            currDate.setHours(currHour);
-            currDate.setMinutes(currMin);
-
-          }
-          else {
-            currMin = 30;
-            currDate.setHours(currHour);
-            currDate.setMinutes(currMin);
-          }
-
-          //if weekend, or friday after 5, start searching monday at 7
-          if(currDate.getDay() == 6 || currDate.getDay == 0 ||
-             (currDate.getDay() == 5 && currDate.getHour >= 5)) {
-            if(currDate.getDay() == 6) {
-              currDate.setDate(currDate.getDate() + 2);
-            }
-            else if(currDate.getDay() === 0) {
-              currDate.setDate(currDate.getDate() + 1);
-            }
-            else {
-              currDate.setDate(currDate.getDate() + 3);
-            }
-            currHour = 7;
-            currMin = 0;
-            currDate.setHours(7);
-            currDate.setMinutes(0);
-          }
-
-          var timetable = {};
-          //search for the next 3 days
-          for(var i = 0; i < 48; i++) {
-            //if past 5PM, go back to 7AM the next day
-            if(currHour >= 17 || currHour < 7) {
-              currHour = 7;
-              currMin = 0;
-              currDate.setHours(currHour);
-              currDate.setMinutes(currMin);
-              currDate.setDate(currDate.getDate()+1);
-            }
-            // var tzoffset = (new Date()).getTimezoneOffset() * 60000; //offset in milliseconds
-            // var localISOTime = (new Date(currDate - tzoffset)).toISOString().slice(0, -1);
-            // => '2015-01-26T06:40:36.181' => removes Z at the end
-            timetable[currDate.toUTCString()] = 0;
-
-            var x = 0;
-            //iterate through all meetings. if we find a meeting that conflicts, set that to busy
-            //if we don't, then the time is open/free
-            while(x < meetings.length) {
-              //i thought i'd be able to cut down on the meetings searched through, but this doesn't work???
-          //     if((new Date(meetings[x].end_datetime)).getTime() < (new Date(localISOTime)).getTime()) {
-          //       break;
-          //     }
-              //if time is between a meeting, set timetable[time] to 1 (busy)
-              if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toUTCString())).getTime()) && 
-                 ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toUTCString())).getTime())) {
-                //console.log("here");
-                timetable[currDate.toUTCString()] = 1;
-              }
-              x++;
-            }
-
-            if(currMin == 30) {
-              currMin = 0;
-              currHour++;
-              currDate.setHours(currHour);
-              currDate.setMinutes(currMin);
-            }
-            else {
-              currMin = 30;
-              currDate.setMinutes(currMin);
-            }
-
-          }
+          var timetable = createTimetable(parameters);
 
           var countTimes = 0;
           var suggestions = [];
@@ -1653,6 +1573,104 @@ app.post("/api/meetingSuggestion", function (req, res) {
     }
 
 });
+
+function createTimetable(parameters) {
+
+    var meetings = parameters.meetings || null;
+    //var workdays = parameters.workdays || [1,2,3,4,5]; //list of workdays in the week (0-6)
+    var numDaysAhead = parameters.numDaysAhead || 3; //look ahead 3 days
+    var startTime = parameters.startTime || 7; //default start at 7AM
+    var endTime = parameters.endTime || 17; //default end at 5PM
+
+    //get current date info
+    var currDate = new Date();
+    var currHour = currDate.getHours();
+    var currMin = currDate.getMinutes();
+
+    currDate.setSeconds(0);
+    currDate.setMilliseconds(0);
+
+    //round up to the nearest 30 min
+    if(currMin > 30) {
+      currMin = 0;
+      currHour++;
+      currDate.setHours(currHour);
+      currDate.setMinutes(currMin);
+
+    }
+    else {
+      currMin = 30;
+      currDate.setHours(currHour);
+      currDate.setMinutes(currMin);
+    }
+
+    //if weekend, or friday after endTime, start searching monday at startTime
+    if(currDate.getDay() == 6 || currDate.getDay == 0 ||
+       (currDate.getDay() == 5 && currDate.getHour() >= endTime)) {
+      if(currDate.getDay() == 6) {
+        currDate.setDate(currDate.getDate() + 2);
+      }
+      else if(currDate.getDay() === 0) {
+        currDate.setDate(currDate.getDate() + 1);
+      }
+      else {
+        currDate.setDate(currDate.getDate() + 3);
+      }
+      currHour = startTime;
+      currMin = 0;
+      currDate.setHours(startTime);
+      currDate.setMinutes(0);
+    }
+
+    var timetable = {};
+
+    var workhours = endTime - startTime;
+    //search for the next 3 days
+    for(var i = 0; i < workhours*2*numDaysAhead; i++) { //*2 (for half hour intervals) * numDaysAhead to look
+      //if past endTime, go to startTime the next day
+      if(currHour >= endTime) {
+        currHour = startTime;
+        currMin = 0;
+        currDate.setHours(currHour);
+        currDate.setMinutes(currMin);
+        currDate.setDate(currDate.getDate()+1);
+      }
+
+      timetable[currDate.toUTCString()] = 0;
+
+      var x = 0;
+      //iterate through all meetings. if we find a meeting that conflicts, set that to busy
+      //if we don't, then the time is open/free
+      while(x < meetings.length) {
+        //i thought i'd be able to cut down on the meetings searched through, but this doesn't work???
+        // if((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate)).getTime()) {
+        //   break;
+        // }
+        //if time is between a meeting, set timetable[time] to 1 (busy)
+        if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toUTCString())).getTime()) && 
+           ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toUTCString())).getTime())) {
+          //console.log("here");
+          timetable[currDate.toUTCString()] = 1;
+        }
+        x++;
+      }
+
+      //increment in half hour intervals
+      if(currMin == 30) {
+        currMin = 0;
+        currHour++;
+        currDate.setHours(currHour);
+        currDate.setMinutes(currMin);
+      }
+      else {
+        currMin = 30;
+        currDate.setMinutes(currMin);
+      }
+
+    }
+
+    return timetable;
+}
 
 
 function cleanup() {
