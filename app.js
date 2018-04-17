@@ -18,33 +18,6 @@ app.use(express.static(__dirname));
 
 var port = process.env.PORT || 3000;
 
-<<<<<<< HEAD
-//sets up a pool of 10 connections to the DB
-var pool = mysql.createPool({
-    connectionLimit : 10,
-    host            : process.env.RDS_HOSTNAME,
-    user            : process.env.RDS_USERNAME,
-    password        : process.env.RDS_PASSWORD,
-    port            : process.env.RDS_PORT
-});
-
-// test the connection to the DB
-// var testConnection = new Promise(function(resolve, reject) {
-
-//     return pool.getConnection(function(err, connection) {
-//         if (err) {
-//             console.error(err);
-//             resolve(false);
-//         }
-
-//         console.log("successfully connected to database!");
-//         connection.release();
-//         resolve(true);
-//     });
-// });
-
-=======
->>>>>>> b550670cdcf22e0afb0fc765236a4dc4d2f634fb
 app.get('/', function (req, res) {
     //res.sendFile(__dirname + "/fullcalendar/demos/default.html");
     //res.json({message: "hello world!"});
