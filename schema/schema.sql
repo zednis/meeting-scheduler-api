@@ -59,3 +59,6 @@ CREATE TABLE IF NOT EXISTS RoomResourceMeetingRoomAssociation (
 );
 
 ALTER TABLE Meeting ADD COLUMN room_name VARCHAR(50) NULL;
+
+-- for MySQL 5.7.4+ drop the IGNORE on the following command
+ALTER IGNORE TABLE User ADD UNIQUE (email);
