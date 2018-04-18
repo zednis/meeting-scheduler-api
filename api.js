@@ -809,9 +809,9 @@ const createTimetable = function(obj) {
           //if we don't, then the time is open/free
           while(x < meetings.length) {
             //if time is between a meeting, set timetable[time] to 1 (busy)
-            if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toUTCString())).getTime()) && 
-               ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toUTCString())).getTime())) {
-              timetable[currDate.toUTCString()] = 1;
+            if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toISOString())).getTime()) && 
+               ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toISOString())).getTime())) {
+              timetable[currDate.toISOString()] = 1;
             }
             x++;
           }
