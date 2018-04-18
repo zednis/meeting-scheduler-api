@@ -717,7 +717,7 @@ exports.meetingSuggestion = function(obj) {
         .then(conn => { connection = conn; return conn.query(getMeetingSql, [participants])})
         .then(results => { return createTimetable(timetableFormatter(results, obj)) })
         .then(timetable => { return getSuggestions(timetable) })
-        .then(obj => { /*console.log(obj);*/ return finish(obj)})
+        .then(obj => { console.log(obj); return finish(obj)})
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
 };
@@ -742,7 +742,6 @@ const createTimetable = function(obj) {
 
         //get current date info
         var currDate = new Date();
-        console.log(currDate);
         var currHour = currDate.getHours();
         var currMin = currDate.getMinutes();
 

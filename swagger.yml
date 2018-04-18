@@ -374,14 +374,10 @@ paths:
           schema:
             $ref: "#/definitions/MeetingSuggestionObject"
       tags:
-        - Users
+        - Meetings
       responses:
-        201:
-          description: Created
-          headers:
-            Location:
-              description: relative URL to created user record
-              type: string
+        200:
+          description: OK
           schema:
             $ref: "#/definitions/ActionResponse"
 
@@ -638,6 +634,5 @@ definitions:
       numDaysAhead:
         type: number
         description: number of days ahead to search. default 3
-          $ref:
     required:
       - meetings
