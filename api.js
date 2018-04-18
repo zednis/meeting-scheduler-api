@@ -44,6 +44,11 @@ const getOne = function (results, formatter=null) {
     });
 };
 
+const getCreated = function (results, createdId=null) {
+    const foo = (createdId) ? createdId : results.insertId;
+    return new Promise(function (resolve, reject) { resolve({status: "SUCCESS", createdId: foo}); });
+};
+
 const finish = function (object) {
     return new Promise(function(resolve, reject){ resolve(object); });
 };
@@ -366,9 +371,6 @@ exports.getRooms = function(parameters) {
 
 const getMeetingsByRoomResponse = function (results) {
     return new Promise(function (resolve, reject) {
-
-        console.log("in getMeetingsByRoomResponse");
-
         if (results.length === 0) {
             resolve({status: "NOT FOUND"});
         } else {
@@ -395,33 +397,26 @@ exports.getMeetingsByRoomName = function (roomName) {
 exports.createRoom = function (room) {
 
     const calendarName = room.name + "'s Meeting Room Calendar" || "";
+
     const calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
+
     const roomSql = "INSERT INTO ebdb.MeetingRoom (name, calendar) VALUES (?, ?);";
 
-    return new Promise(function (resolve, reject) {
-        db.pool.getConnection()
-            .then(function (conn) {
-                conn.query(calendarSql, [calendarName])
-                    .then(function (results) {
-                        const inserts = [room.name, results.insertId];
-                        conn.query(roomSql, inserts)
-                            .then(function (results) {
-                                resolve({status: "SUCCESS", createdId: room.name});
-                                conn.release();
-                            })
-                            .catch(function (err) {
-                                console.warn(err);
-                                reject({status: "FAILURE", error: err});
-                                conn.release();
-                            });
-                    })
-                    .catch(function (err) {
-                        console.warn(err);
-                        reject({status: "FAILURE", error: err});
-                        conn.release();
-                    });
-            });
-    });
+    const addRoomResourceSql = "INSERT IGNORE INTO ebdb.RoomResource (name) VALUES (?)";
+
+    let associationResouresSql = "INSERT IGNORE INTO ebdb.RoomResourceMeetingRoomAssociation (room, resource)";
+    associationResouresSql += " SELECT ?, id FROM ebdb.RoomResource WHERE name in (?);";
+
+    let connection, object, roomResults;
+    return db.pool.getConnection()
+        .then(conn => {connection = conn; return conn.query(calendarSql, [calendarName])})
+        .then(calendarResults => { return connection.query(roomSql, [room.name, calendarResults.insertId])})
+        .then(r => { roomResults = r; return getCreated(r, room.name); })
+        .then(obj => { object = obj; return connection.query(addRoomResourceSql, room.resources)})
+        .then((r) => { return connection.query(associationResouresSql,[roomResults.insertId, room.resources])})
+        .then((r) => { return finish(object)})
+        .catch(err => { return getError(err) })
+        .finally(() => { if(connection) { connection.release(); }});
 };
 
 exports.updateRoom = function(obj) {
@@ -708,5 +703,151 @@ exports.deleteUser = function (userId) {
                         conn.release();
                     });
             });
+    });
+};
+
+exports.meetingSuggestion = function(obj) {
+
+    var participants = obj.participants || [];
+
+    //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
+    const getMeetingSql = "SELECT DISTINCT(start_datetime), end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
+                        + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
+    let connection;
+    return db.pool.getConnection()
+        .then(conn => { connection = conn; return conn.query(getMeetingSql, [participants])})
+        .then(results => { return createTimetable(timetableFormatter(results, obj)) })
+        .then(timetable => { return getSuggestions(timetable) })
+        .then(obj => { return finish(obj)})
+        .catch(err => { return getError(err)})
+        .finally(() => { if(connection) { connection.release(); }});
+};
+
+const timetableFormatter = function(results, obj) {
+    return {
+        meetings: results,
+        numDaysAhead: obj.numDaysAhead || null,
+        startTime: obj.startTime || null,
+        endTime: obj.endTime || null
+    }
+};
+
+
+const createTimetable = function(obj) {
+    return new Promise(function(resolve, reject) {
+
+        var meetings = obj.meetings || null;
+        var numDaysAhead = obj.numDaysAhead || 3; //default search ahead 3 days
+        var startTime = obj.startTime || 7; //default start at 7AM
+        var endTime = obj.endTime || 17; //default end at 5PM
+
+        //get current date info
+        var currDate = new Date();
+        var currHour = currDate.getHours();
+        var currMin = currDate.getMinutes();
+
+        currDate.setSeconds(0);
+        currDate.setMilliseconds(0);
+
+        //round up to the nearest 30 min
+        if(currMin > 30) {
+          currMin = 0;
+          currHour++;
+          currDate.setHours(currHour);
+          currDate.setMinutes(currMin);
+
+        }
+        else {
+          currMin = 30;
+          currDate.setHours(currHour);
+          currDate.setMinutes(currMin);
+        }
+
+        //if weekend, or friday after endTime, start searching monday at startTime
+        if(currDate.getDay() == 6 || currDate.getDay == 0 ||
+           (currDate.getDay() == 5 && currDate.getHour() >= endTime)) {
+          if(currDate.getDay() == 6) {
+            currDate.setDate(currDate.getDate() + 2);
+          }
+          else if(currDate.getDay() === 0) {
+            currDate.setDate(currDate.getDate() + 1);
+          }
+          else {
+            currDate.setDate(currDate.getDate() + 3);
+          }
+          currHour = startTime;
+          currMin = 0;
+          currDate.setHours(startTime);
+          currDate.setMinutes(0);
+        }
+
+        //if before startTime, set to startTime
+        if(currHour < startTime) {
+            currHour = startTime;
+            currMin = 0;
+            currDate.setHours(startTime);
+            currDate.setMinutes(0);
+        }
+
+        var timetable = {};
+
+        var workhours = endTime - startTime;
+        for(var i = 0; i < workhours*2*numDaysAhead; i++) { //*2 (for half hour intervals) * numDaysAhead to look
+          //if past endTime, go to startTime the next day
+          if(currHour >= endTime) {
+            currHour = startTime;
+            currMin = 0;
+            currDate.setHours(currHour);
+            currDate.setMinutes(currMin);
+            currDate.setDate(currDate.getDate()+1);
+          }
+
+          timetable[currDate.toISOString()] = 0;
+
+          var x = 0;
+          //iterate through all meetings. if we find a meeting that conflicts, set that to busy
+          //if we don't, then the time is open/free
+          while(x < meetings.length) {
+            //if time is between a meeting, set timetable[time] to 1 (busy)
+            if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toUTCString())).getTime()) && 
+               ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toUTCString())).getTime())) {
+              timetable[currDate.toUTCString()] = 1;
+            }
+            x++;
+          }
+
+          //increment in half hour intervals
+          if(currMin == 30) {
+            currMin = 0;
+            currHour++;
+            currDate.setHours(currHour);
+            currDate.setMinutes(currMin);
+          }
+          else {
+            currMin = 30;
+            currDate.setMinutes(currMin);
+          }
+
+        }
+
+        resolve(timetable);
+    });
+};
+
+const getSuggestions = function(timetable) {
+    return new Promise(function(resolve, reject) {
+        let countTimes = 0;
+        let suggestions = [];
+        //iterate through timetable and find first 5 suggestions
+        for(let time in timetable) {
+            if(countTimes == 5) {
+                break;
+            }
+            if(timetable[time] == 0) {
+                countTimes++;
+                suggestions.push(time);
+            }
+        }
+        resolve(suggestions);
     });
 };

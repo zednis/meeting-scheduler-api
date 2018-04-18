@@ -13,6 +13,7 @@ tags:
 - name: Meetings
 - name: Users
 - name: Rooms
+- name: Suggestions
 paths:
 
   /api/rooms:
@@ -147,6 +148,7 @@ paths:
           description: OK
           schema:
             $ref: "#/definitions/ListOfMeetingInfo"
+
 
   /api/users:
 
@@ -359,6 +361,26 @@ paths:
           description: OK
           schema:
             $ref: "#/definitions/ActionResponse"
+
+
+  /api/meetingSuggestion:
+
+    post:
+      summary: Suggest Meeting Times Given List of Participants
+      parameters:
+        - name: meeting suggestion object
+          in: body
+          description: meeting suggestion object
+          required: true
+          schema:
+            $ref: "#/definitions/MeetingSuggestionRequest"
+      tags:
+        - Suggestions
+      responses:
+        200:
+          description: OK
+          schema:
+            $ref: "#/definitions/MeetingSuggestionResponse"
 
 parameters:
   roomName:
@@ -596,3 +618,49 @@ definitions:
           $ref: "#/definitions/MeetingInfo"
     required:
       - meetings
+
+  MeetingSuggestionRequest:
+    type: object
+    properties:
+      participants:
+        description: participant list for suggested meeting times
+        type: array
+        items:
+          type: string
+          description: participant email
+      startTime:
+        type: number
+        description: workday starting hour (0-23). default 7AM = 7
+      endTime:
+        type: number
+        description: workday end hour (0-23). default 5PM = 17
+      numDaysAhead:
+        type: number
+        description: number of days ahead to search. default 3
+    required:
+      - participants
+
+  MeetingSuggestionResponse:
+    type: object
+    properties:
+      requestURL:
+        type: string
+      action:
+        type: string
+      status:
+        type: number
+      timestamp:
+        type: string
+        format: date-time
+      suggestions:
+        description: a list of suggested meeting times
+        type: array
+        items:
+          type: string
+          format: date-time
+    required:
+      - requestURL
+      - action
+      - status
+      - timestamp
+      - suggestions
