@@ -708,7 +708,8 @@ exports.deleteUser = function (userId) {
 
 exports.meetingSuggestion = function(obj) {
 
-    var participants = obj.participants || null;
+    var participants = obj.participants || [];
+
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
     const getMeetingSql = "SELECT DISTINCT(start_datetime), end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
@@ -717,7 +718,7 @@ exports.meetingSuggestion = function(obj) {
         .then(conn => { connection = conn; return conn.query(getMeetingSql, [participants])})
         .then(results => { return createTimetable(timetableFormatter(results, obj)) })
         .then(timetable => { return getSuggestions(timetable) })
-        .then(obj => { console.log(obj); return finish(obj)})
+        .then(obj => { return finish(obj)})
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
 };

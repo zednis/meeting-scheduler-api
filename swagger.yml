@@ -13,6 +13,7 @@ tags:
 - name: Meetings
 - name: Users
 - name: Rooms
+- name: Suggestions
 paths:
 
   /api/rooms:
@@ -372,14 +373,14 @@ paths:
           description: meeting suggestion object
           required: true
           schema:
-            $ref: "#/definitions/MeetingSuggestionObject"
+            $ref: "#/definitions/MeetingSuggestionRequest"
       tags:
-        - Meetings
+        - Suggestions
       responses:
         200:
           description: OK
           schema:
-            $ref: "#/definitions/ActionResponse"
+            $ref: "#/definitions/MeetingSuggestionResponse"
 
 parameters:
   roomName:
@@ -618,13 +619,15 @@ definitions:
     required:
       - meetings
 
-  MeetingSuggestionObject:
+  MeetingSuggestionRequest:
     type: object
     properties:
-      meetings:
+      participants:
+        description: participant list for suggested meeting times
         type: array
         items:
-          $ref: "#/definitions/MeetingInfo"
+          type: string
+          description: participant email
       startTime:
         type: number
         description: workday starting hour (0-23). default 7AM = 7
@@ -635,4 +638,29 @@ definitions:
         type: number
         description: number of days ahead to search. default 3
     required:
-      - meetings
+      - participants
+
+  MeetingSuggestionResponse:
+    type: object
+    properties:
+      requestURL:
+        type: string
+      action:
+        type: string
+      status:
+        type: number
+      timestamp:
+        type: string
+        format: date-time
+      suggestions:
+        description: a list of suggested meeting times
+        type: array
+        items:
+          type: string
+          format: date-time
+    required:
+      - requestURL
+      - action
+      - status
+      - timestamp
+      - suggestions

@@ -254,6 +254,7 @@ function suggest(req, res, apicall, object) {
         .then(function (result) {
             res.statusCode = 200;
             msg.status = 200;
+            msg.suggestions = result;
             res.send(msg);
         })
         .catch(function (error) {
