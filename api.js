@@ -802,7 +802,7 @@ const createTimetable = function(obj) {
             currDate.setDate(currDate.getDate()+1);
           }
 
-          timetable[currDate.toUTCString()] = 0;
+          timetable[currDate.toISOString()] = 0;
 
           var x = 0;
           //iterate through all meetings. if we find a meeting that conflicts, set that to busy
