@@ -126,6 +126,11 @@ app.delete("/api/rooms/:roomName", function (req, res) {
    _delete(req, res, api.deleteRoom, req.params.roomName);
 });
 
+//get meeting suggestions
+app.post("/api/meetingSuggestion", function (req, res) {
+  suggest(req, res, api.meetingSuggestion, req.body);
+});
+
 function _delete(req, res, apicall, parameter) {
 
     const msg = {
@@ -234,6 +239,29 @@ function update(req, res, apicall, object) {
         .catch(function (error) {
             res.statusCode = 500;
             msg.status = 500;
+            res.json(msg);
+        });
+}
+
+function suggest(req, res, apicall, object) {
+  const msg = {
+        requestURL: req.originalUrl,
+        action: req.method,
+        timestamp: new Date()
+    };
+
+    apicall(object)
+        .then(function (result) {
+            res.statusCode = 200;
+            msg.status = 200;
+            msg.suggestions = result;
+            res.send(msg);
+        })
+        .catch(function (error) {
+            console.log(error);
+            res.statusCode = 500;
+            msg.status = 500;
+            msg.error = error;
             res.json(msg);
         });
 }
