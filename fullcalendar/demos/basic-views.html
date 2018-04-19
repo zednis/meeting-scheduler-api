@@ -1,7 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="CalendarApp">
 <head>
 <meta charset='utf-8' />
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+<script src='../../calendar.js'></script>
 <link href='../fullcalendar.min.css' rel='stylesheet' />
 <link href='../fullcalendar.print.min.css' rel='stylesheet' media='print' />
 <script src='../lib/moment.min.js'></script>
@@ -99,8 +101,15 @@
 </style>
 </head>
 <body>
-
-  <div id='calendar'></div>
+  <div id='wrapper' ng-controller='CalendarCtrl'>
+    <div class="form-inline">
+      <div class="form-group">
+        <input type="text" class="form-control" ng-model="searchQuery" id="search" placeholder="Enter User Email">
+        <button class='btn bn-secondary' id="submitButon" type="button" ng-click="newSearch()">Load</button>
+      </div>
+    </div>
+    <div id='calendar'></div>
+  </div>
 
 </body>
 </html>

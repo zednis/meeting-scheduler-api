@@ -3,6 +3,7 @@ var AWS = require('aws-sdk');
 var express = require('express');
 var bodyParser = require('body-parser');
 var Promise = require('promise');
+var http = require('http').Server(express);
 
 var api = require('./api.js');
 
@@ -21,7 +22,7 @@ var port = process.env.PORT || 3000;
 app.get('/', function (req, res) {
     //res.sendFile(__dirname + "/fullcalendar/demos/default.html");
     //res.json({message: "hello world!"});
-    res.redirect('/fullcalendar/demos/selectable.html');
+    res.redirect('/fullcalendar/demos/basic-views.html');
 });
 
 app.get('/api/dbStatus', function (req, res) {

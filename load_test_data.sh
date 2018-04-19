@@ -1,7 +1,7 @@
 #! /bin/bash
 
 #API=http://meeting-scheduler.us-east-1.elasticbeanstalk.com/
-API=http://127.0.0.1:3000/
+API=http://127.0.0.1:3000
 
 # create users
 
