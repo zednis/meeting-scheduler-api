@@ -713,22 +713,26 @@ exports.meetingSuggestion = function(obj) {
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
     const getMeetingSql = "SELECT DISTINCT(start_datetime), end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
+    const getRoomNamesSql = "SELECT name FROM ebdb.MeetingRoom;"
     let connection;
+    let roomNames;
     return db.pool.getConnection()
-        .then(conn => { connection = conn; return conn.query(getMeetingSql, [participants])})
-        .then(results => { return createTimetable(timetableFormatter(results, obj)) })
+        .then(conn => connection = conn; return conn.query(getRoomNamesSql)})
+        .then(results => { roomNames = results; return conn.query(getMeetingSql, [participants])})
+        .then(results => { return createTimetable(timetableFormatter(results, obj, roomNames)) })
         .then(timetable => { return getSuggestions(timetable) })
         .then(obj => { return finish(obj)})
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
-const timetableFormatter = function(results, obj) {
+const timetableFormatter = function(results, obj, roomNames) {
     return {
         meetings: results,
         numDaysAhead: obj.numDaysAhead || null,
         startTime: obj.startTime || null,
-        endTime: obj.endTime || null
+        endTime: obj.endTime || null,
+        rooms: roomNames || null
     }
 };
 
@@ -740,6 +744,7 @@ const createTimetable = function(obj) {
         var numDaysAhead = obj.numDaysAhead || 3; //default search ahead 3 days
         var startTime = obj.startTime || 7; //default start at 7AM
         var endTime = obj.endTime || 17; //default end at 5PM
+        var rooms = obj.rooms;
 
         //get current date info
         var currDate = new Date();
@@ -802,16 +807,34 @@ const createTimetable = function(obj) {
             currDate.setDate(currDate.getDate()+1);
           }
 
-          timetable[currDate.toISOString()] = 0;
+          var endDateTime = new Date(currDate.getTime());
+          //increment in half hour intervals
+          if(currMin == 30) {
+            endDateTime.setHours(currHour + 1);
+            endDateTime.setMinutes(0);
+          }
+          else {
+            endDateTime.setMinutes(30);
+          }
+
+          var timeslot = {
+            startDateTime: currDate.toISOString(),
+            endDateTime: endDateTime,
+            rooms: rooms
+          };
+          timetable[timeslot] = 0;
 
           var x = 0;
           //iterate through all meetings. if we find a meeting that conflicts, set that to busy
           //if we don't, then the time is open/free
           while(x < meetings.length) {
             //if time is between a meeting, set timetable[time] to 1 (busy)
-            if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toISOString())).getTime()) && 
-               ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toISOString())).getTime())) {
-              timetable[currDate.toISOString()] = 1;
+            //TODO: check inequality signs/logic
+            if((((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toISOString())).getTime()) && 
+                ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toISOString())).getTime())) ||
+               (((new Date(meetings[x].start_datetime)).getTime() <= (new Date(endDateTime.toISOString())).getTime()) && 
+                ((new Date(meetings[x].end_datetime)).getTime() >= (new Date(endDateTime.toISOString())).getTime()))) {
+              timetable[timeslot] = 1;
             }
             x++;
           }
@@ -831,6 +854,19 @@ const createTimetable = function(obj) {
         }
 
         resolve(timetable);
+    });
+};
+
+const getUserAvailableTimes = function(timetable) {
+    return new Promise(function(resolve, reject) {
+        let times = [];
+        //iterate through timetable and find first 5 suggestions
+        for(let time in timetable) {
+            if(timetable[time] == 0) {
+                times.push(time);
+            }
+        }
+        resolve(times);
     });
 };
 
