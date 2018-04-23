@@ -713,7 +713,7 @@ exports.meetingSuggestion = function(obj) {
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
     const getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
                       + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) GROUP BY room_name;";
-    const getOtherRoomsSql = "SELECT name FROM ebdb.meetingroom WHERE name NOT IN (SELECT DISTINCT room_name FROM ebdb.meeting "
+    const getOtherRoomsSql = "SELECT name FROM ebdb.meetingroom WHERE name NOT  IN (SELECT DISTINCT room_name FROM ebdb.meeting "
                            + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4));"
     const getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
@@ -934,6 +934,7 @@ const getSuggestions = function(userTimes) {
             }
             if((timeSlot.rooms).length != 0) {
                 countTimes++;
+                delete timeSlot.available;
                 suggestions.push(timeSlot);
             }
         }
