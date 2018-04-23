@@ -727,7 +727,7 @@ exports.meetingSuggestion = function(obj) {
         .then(results => { otherRooms = results; return connection.query(getMeetingSql, [participants])})
         .then(results => { return createTimetable(timetableFormatter(results, obj), otherRooms) })
         .then(timetable => { return getUserAvailableTimes(timetable)})
-        .then(userTimes => { console.log(roomMeetings); return createRoomSuggestions(userTimes, roomMeetings)})
+        .then(userTimes => { return createRoomSuggestions(userTimes, roomMeetings)})
         .then(userTimes => { return getSuggestions(userTimes)})
         .then(obj => { return finish(obj)})
         .catch(err => { return getError(err)})
@@ -887,15 +887,12 @@ const getUserAvailableTimes = function(timetable) {
 };
 
 const createRoomSuggestions = function(userTimes, roomMeetings) {
-    console.log(userTimes);
-    console.log(roomMeetings);
 
     return new Promise(function(resolve, reject) {
         for(var x = 0; x < userTimes.length; x++) {
             var timeSlot = userTimes[x];
             for(var y = 0; y < roomMeetings.length; y++) {
                 var room = roomMeetings[y];
-                //console.log(room);
                 var roomName = room.room_name;
                 var meetingTimes = (room.meetingTimes).split("|");
                 timeSlot.rooms.push(roomName);
