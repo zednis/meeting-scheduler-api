@@ -711,40 +711,46 @@ exports.meetingSuggestion = function(obj) {
     var participants = obj.participants || [];
 
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
-    const getMeetingSql = "SELECT DISTINCT(start_datetime), end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
+    const getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
+                      + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) GROUP BY room_name;";
+    const getOtherRoomsSql = "SELECT name FROM ebdb.meetingroom WHERE name NOT IN (SELECT DISTINCT room_name FROM ebdb.meeting "
+                           + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4));"
+    const getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
-    const getRoomNamesSql = "SELECT name FROM ebdb.MeetingRoom;"
+
     let connection;
-    let roomNames;
+    let roomMeetings;
+    let otherRooms;
     return db.pool.getConnection()
-        .then(conn => connection = conn; return conn.query(getRoomNamesSql)})
-        .then(results => { roomNames = results; return conn.query(getMeetingSql, [participants])})
-        .then(results => { return createTimetable(timetableFormatter(results, obj, roomNames)) })
-        .then(timetable => { return getSuggestions(timetable) })
+        .then(conn => { connection = conn; return conn.query(getRoomMeetingsSql)})
+        .then(results => { roomMeetings = results; return connection.query(getOtherRoomsSql)})
+        .then(results => { otherRooms = results; return connection.query(getMeetingSql, [participants])})
+        .then(results => { return createTimetable(timetableFormatter(results, obj), otherRooms) })
+        .then(timetable => { return getUserAvailableTimes(timetable)})
+        .then(userTimes => { console.log(roomMeetings); return createRoomSuggestions(userTimes, roomMeetings)})
+        .then(userTimes => { return getSuggestions(userTimes)})
         .then(obj => { return finish(obj)})
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
 };
 
-const timetableFormatter = function(results, obj, roomNames) {
+const timetableFormatter = function(results, obj) {
     return {
         meetings: results,
         numDaysAhead: obj.numDaysAhead || null,
         startTime: obj.startTime || null,
-        endTime: obj.endTime || null,
-        rooms: roomNames || null
+        endTime: obj.endTime || null
     }
 };
 
 
-const createTimetable = function(obj) {
+const createTimetable = function(obj, otherRooms) {
     return new Promise(function(resolve, reject) {
 
         var meetings = obj.meetings || null;
         var numDaysAhead = obj.numDaysAhead || 3; //default search ahead 3 days
         var startTime = obj.startTime || 7; //default start at 7AM
         var endTime = obj.endTime || 17; //default end at 5PM
-        var rooms = obj.rooms;
 
         //get current date info
         var currDate = new Date();
@@ -794,7 +800,7 @@ const createTimetable = function(obj) {
             currDate.setMinutes(0);
         }
 
-        var timetable = {};
+        var timetable = [];
 
         var workhours = endTime - startTime;
         for(var i = 0; i < workhours*2*numDaysAhead; i++) { //*2 (for half hour intervals) * numDaysAhead to look
@@ -817,12 +823,20 @@ const createTimetable = function(obj) {
             endDateTime.setMinutes(30);
           }
 
+          var otherRoomNames = [];
+          for(var t = 0; t < otherRooms.length; t++) {
+            otherRoomNames.push(otherRooms[t].name);
+          }
+
+          console.log(otherRoomNames);
+
           var timeslot = {
             startDateTime: currDate.toISOString(),
             endDateTime: endDateTime,
-            rooms: rooms
+            rooms: otherRoomNames,
+            available: 0
           };
-          timetable[timeslot] = 0;
+          //timetable.push(timeslot);
 
           var x = 0;
           //iterate through all meetings. if we find a meeting that conflicts, set that to busy
@@ -834,10 +848,12 @@ const createTimetable = function(obj) {
                 ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toISOString())).getTime())) ||
                (((new Date(meetings[x].start_datetime)).getTime() <= (new Date(endDateTime.toISOString())).getTime()) && 
                 ((new Date(meetings[x].end_datetime)).getTime() >= (new Date(endDateTime.toISOString())).getTime()))) {
-              timetable[timeslot] = 1;
+              //timetable[timetable.length - 1].available = 1;
+                timeslot.available = 1;
             }
             x++;
           }
+          timetable.push(timeslot);
 
           //increment in half hour intervals
           if(currMin == 30) {
@@ -861,27 +877,64 @@ const getUserAvailableTimes = function(timetable) {
     return new Promise(function(resolve, reject) {
         let times = [];
         //iterate through timetable and find first 5 suggestions
-        for(let time in timetable) {
-            if(timetable[time] == 0) {
-                times.push(time);
+        for(var i = 0; i < timetable.length; i++) {
+            if(timetable[i].available == 0) {
+                times.push(timetable[i]);
             }
         }
         resolve(times);
     });
 };
 
-const getSuggestions = function(timetable) {
+const createRoomSuggestions = function(userTimes, roomMeetings) {
+    console.log(userTimes);
+    console.log(roomMeetings);
+
+    return new Promise(function(resolve, reject) {
+        for(var x = 0; x < userTimes.length; x++) {
+            var timeSlot = userTimes[x];
+            for(var y = 0; y < roomMeetings.length; y++) {
+                var room = roomMeetings[y];
+                //console.log(room);
+                var roomName = room.room_name;
+                var meetingTimes = (room.meetingTimes).split("|");
+                timeSlot.rooms.push(roomName);
+                for(var i = 0; i < meetingTimes.length - 1; i+=2) {
+
+                    var startTime = meetingTimes[i];
+                    var endTime = meetingTimes[i+1];
+
+                    if((((new Date(timeSlot.startDateTime)).getTime() <= (new Date(startTime)).getTime()) && 
+                    ((new Date(timeSlot.endDateTime)).getTime() > (new Date(startTime)).getTime())) ||
+                   (((new Date(timeSlot.startDateTime)).getTime() <= (new Date(endTime)).getTime()) && 
+                    ((new Date(timeSlot.endDateTime)).getTime() >= (new Date(endTime)).getTime()))) {
+                        timeSlot.rooms.pop();
+                        break;
+                    }
+
+                }
+
+
+            }
+        }
+        resolve(userTimes);
+    });
+
+};
+
+const getSuggestions = function(userTimes) {
     return new Promise(function(resolve, reject) {
         let countTimes = 0;
         let suggestions = [];
         //iterate through timetable and find first 5 suggestions
-        for(let time in timetable) {
+        for(var i = 0; i < userTimes.length; i++) {
+            var timeSlot = userTimes[i];
             if(countTimes == 5) {
                 break;
             }
-            if(timetable[time] == 0) {
+            if((timeSlot.rooms).length != 0) {
                 countTimes++;
-                suggestions.push(time);
+                suggestions.push(timeSlot);
             }
         }
         resolve(suggestions);
