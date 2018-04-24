@@ -108,7 +108,6 @@ app.get("/api/rooms/:roomName", function (req, res) {
     get(req, res, api.getRoomByName, roomName);
 });
 
-
 // retrieve a list of meetings for the specified room, filtered by query parameters
 app.get("/api/rooms/:roomName/meetings", function (req, res) {
     const roomName = req.params.roomName;

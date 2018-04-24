@@ -715,13 +715,24 @@ exports.meetingSuggestion = function(obj) {
     var participants = obj.participants || [];
 
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
-    const getMeetingSql = "SELECT DISTINCT(start_datetime), end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
+    const getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
+                      + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) GROUP BY room_name;";
+    const getOtherRoomsSql = "SELECT name FROM ebdb.meetingroom WHERE name NOT  IN (SELECT DISTINCT room_name FROM ebdb.meeting "
+                           + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4));"
+    const getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
+
     let connection;
+    let roomMeetings;
+    let otherRooms;
     return db.pool.getConnection()
-        .then(conn => { connection = conn; return conn.query(getMeetingSql, [participants])})
-        .then(results => { return createTimetable(timetableFormatter(results, obj)) })
-        .then(timetable => { return getSuggestions(timetable) })
+        .then(conn => { connection = conn; return conn.query(getRoomMeetingsSql)})
+        .then(results => { roomMeetings = results; return connection.query(getOtherRoomsSql)})
+        .then(results => { otherRooms = results; return connection.query(getMeetingSql, [participants])})
+        .then(results => { return createTimetable(timetableFormatter(results, obj), otherRooms) })
+        .then(timetable => { return getUserAvailableTimes(timetable)})
+        .then(userTimes => { return createRoomSuggestions(userTimes, roomMeetings)})
+        .then(userTimes => { return getSuggestions(userTimes)})
         .then(obj => { return finish(obj)})
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
@@ -737,7 +748,7 @@ const timetableFormatter = function(results, obj) {
 };
 
 
-const createTimetable = function(obj) {
+const createTimetable = function(obj, otherRooms) {
     return new Promise(function(resolve, reject) {
 
         var meetings = obj.meetings || null;
@@ -753,19 +764,6 @@ const createTimetable = function(obj) {
         currDate.setSeconds(0);
         currDate.setMilliseconds(0);
 
-        //round up to the nearest 30 min
-        if(currMin > 30) {
-          currMin = 0;
-          currHour++;
-          currDate.setHours(currHour);
-          currDate.setMinutes(currMin);
-
-        }
-        else {
-          currMin = 30;
-          currDate.setHours(currHour);
-          currDate.setMinutes(currMin);
-        }
 
         //if weekend, or friday after endTime, start searching monday at startTime
         if(currDate.getDay() == 6 || currDate.getDay == 0 ||
@@ -785,6 +783,23 @@ const createTimetable = function(obj) {
           currDate.setMinutes(0);
         }
 
+        //round up to the nearest 30 min
+        if(currMin > 30) {
+          currMin = 0;
+          currHour++;
+          if(currHour == 24) {
+            currHour = 0;
+          }
+          currDate.setHours(currHour);
+          currDate.setMinutes(currMin);
+
+        }
+        else if(currMin < 30 && currMin != 0) {
+          currMin = 30;
+          currDate.setHours(currHour);
+          currDate.setMinutes(currMin);
+        }
+
         //if before startTime, set to startTime
         if(currHour < startTime) {
             currHour = startTime;
@@ -793,7 +808,7 @@ const createTimetable = function(obj) {
             currDate.setMinutes(0);
         }
 
-        var timetable = {};
+        var timetable = [];
 
         var workhours = endTime - startTime;
         for(var i = 0; i < workhours*2*numDaysAhead; i++) { //*2 (for half hour intervals) * numDaysAhead to look
@@ -806,19 +821,54 @@ const createTimetable = function(obj) {
             currDate.setDate(currDate.getDate()+1);
           }
 
-          timetable[currDate.toISOString()] = 0;
+          var endDateTime = new Date(currDate.getTime());
+          //increment in half hour intervals
+          if(currMin == 30) {
+            endDateTime.setHours(currHour + 1);
+            endDateTime.setMinutes(0);
+          }
+          else {
+            endDateTime.setMinutes(30);
+          }
+
+          var otherRoomNames = [];
+          for(var t = 0; t < otherRooms.length; t++) {
+            otherRoomNames.push(otherRooms[t].name);
+          }
+
+          //console.log(otherRoomNames);
+
+          var timeslot = {
+            startDateTime: currDate.toISOString(),
+            endDateTime: endDateTime,
+            rooms: otherRoomNames,
+            available: 0
+          };
+          //timetable.push(timeslot);
 
           var x = 0;
           //iterate through all meetings. if we find a meeting that conflicts, set that to busy
           //if we don't, then the time is open/free
           while(x < meetings.length) {
+
+            var meetingObj = {
+                start: (new Date(meetings[x].start_datetime)).getTime(),
+                end: (new Date(meetings[x].end_datetime)).getTime()
+            };
+
+            var timeSlotObj = {
+                start: (new Date(currDate.toISOString())).getTime(),
+                end: (new Date(endDateTime.toISOString())).getTime()
+            };
+
             //if time is between a meeting, set timetable[time] to 1 (busy)
-            if(((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toISOString())).getTime()) && 
-               ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toISOString())).getTime())) {
-              timetable[currDate.toISOString()] = 1;
+            //TODO: check inequality signs/logic
+            if(checkMeetingIntersect(meetingObj, timeSlotObj)) {
+                timeslot.available = 1;
             }
             x++;
           }
+          timetable.push(timeslot);
 
           //increment in half hour intervals
           if(currMin == 30) {
@@ -838,18 +888,87 @@ const createTimetable = function(obj) {
     });
 };
 
-const getSuggestions = function(timetable) {
+const getUserAvailableTimes = function(timetable) {
+    return new Promise(function(resolve, reject) {
+        let times = [];
+        //iterate through timetable and find first 5 suggestions
+        for(var i = 0; i < timetable.length; i++) {
+            if(timetable[i].available == 0) {
+                times.push(timetable[i]);
+            }
+        }
+        resolve(times);
+    });
+};
+
+const createRoomSuggestions = function(userTimes, roomMeetings) {
+
+    return new Promise(function(resolve, reject) {
+        for(var x = 0; x < userTimes.length; x++) {
+            var timeSlot = userTimes[x];
+            for(var y = 0; y < roomMeetings.length; y++) {
+                var room = roomMeetings[y];
+                var roomName = room.room_name;
+                var meetingTimes = (room.meetingTimes).split("|");
+                timeSlot.rooms.push(roomName);
+                for(var i = 0; i < meetingTimes.length - 1; i+=2) {
+
+                    var meetingObj = {
+                        start: (new Date(meetingTimes[i])).getTime(),
+                        end: (new Date(meetingTimes[i+1])).getTime()
+                    };
+
+                    var timeSlotObj = {
+                        start: (new Date(timeSlot.startDateTime)).getTime(),
+                        end: (new Date(timeSlot.endDateTime)).getTime()
+                    };
+
+                    if(checkMeetingIntersect(meetingObj, timeSlotObj)) {
+                        timeSlot.rooms.pop();
+                        break;
+                    }
+
+                }
+
+
+            }
+        }
+        resolve(userTimes);
+    });
+
+};
+
+const checkMeetingIntersect = function(meetingObj, timeSlotObj) {
+    var meetingStart = (new Date(meetingObj.start)).getTime();
+    var meetingEnd =(new Date(meetingObj.end)).getTime();
+    var timeSlotStart = (new Date(timeSlotObj.start)).getTime();
+    var timeSlotEnd = (new Date(timeSlotObj.end)).getTime();
+
+    if((meetingStart >= timeSlotStart && meetingStart < timeSlotEnd) 
+    || (meetingEnd > timeSlotStart && meetingEnd <= timeSlotEnd) 
+    || (meetingStart <= timeSlotStart && meetingEnd >= timeSlotEnd)) {
+
+        return true;
+    }
+    else {
+        return false;
+    }
+};
+
+const getSuggestions = function(userTimes) {
     return new Promise(function(resolve, reject) {
         let countTimes = 0;
         let suggestions = [];
         //iterate through timetable and find first 5 suggestions
-        for(let time in timetable) {
+        for(var i = 0; i < userTimes.length; i++) {
+            var timeSlot = userTimes[i];
             if(countTimes == 5) {
                 break;
             }
-            if(timetable[time] == 0) {
+            if((timeSlot.rooms).length != 0) {
                 countTimes++;
-                suggestions.push(time);
+                delete timeSlot.available;
+                suggestions.push(timeSlot);
             }
         }
         resolve(suggestions);
