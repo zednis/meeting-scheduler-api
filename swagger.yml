@@ -653,11 +653,26 @@ definitions:
         type: string
         format: date-time
       suggestions:
-        description: a list of suggested meeting times
+        description: a list of suggested meeting times and rooms
         type: array
         items:
-          type: string
-          format: date-time
+          type: object
+          properties:
+            startDateTime:
+              type: string`
+              description: time slot start datetime
+              format: date-time
+            endDateTime:
+              type: string`
+              description: time slot end datetime
+              format: date-time
+            rooms:
+              type: array
+              description: list of room names available during that time slot
+              items:
+                type: string
+                description: room name
+
     required:
       - requestURL
       - action
