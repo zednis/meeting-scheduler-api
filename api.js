@@ -760,19 +760,6 @@ const createTimetable = function(obj, otherRooms) {
         currDate.setSeconds(0);
         currDate.setMilliseconds(0);
 
-        //round up to the nearest 30 min
-        if(currMin > 30) {
-          currMin = 0;
-          currHour++;
-          currDate.setHours(currHour);
-          currDate.setMinutes(currMin);
-
-        }
-        else {
-          currMin = 30;
-          currDate.setHours(currHour);
-          currDate.setMinutes(currMin);
-        }
 
         //if weekend, or friday after endTime, start searching monday at startTime
         if(currDate.getDay() == 6 || currDate.getDay == 0 ||
@@ -790,6 +777,23 @@ const createTimetable = function(obj, otherRooms) {
           currMin = 0;
           currDate.setHours(startTime);
           currDate.setMinutes(0);
+        }
+
+        //round up to the nearest 30 min
+        if(currMin > 30) {
+          currMin = 0;
+          currHour++;
+          if(currHour == 24) {
+            currHour = 0;
+          }
+          currDate.setHours(currHour);
+          currDate.setMinutes(currMin);
+
+        }
+        else if(currMin < 30 && currMin != 0) {
+          currMin = 30;
+          currDate.setHours(currHour);
+          currDate.setMinutes(currMin);
         }
 
         //if before startTime, set to startTime
@@ -828,7 +832,7 @@ const createTimetable = function(obj, otherRooms) {
             otherRoomNames.push(otherRooms[t].name);
           }
 
-          console.log(otherRoomNames);
+          //console.log(otherRoomNames);
 
           var timeslot = {
             startDateTime: currDate.toISOString(),
@@ -842,13 +846,20 @@ const createTimetable = function(obj, otherRooms) {
           //iterate through all meetings. if we find a meeting that conflicts, set that to busy
           //if we don't, then the time is open/free
           while(x < meetings.length) {
+
+            var meetingObj = {
+                start: (new Date(meetings[x].start_datetime)).getTime(),
+                end: (new Date(meetings[x].end_datetime)).getTime()
+            };
+
+            var timeSlotObj = {
+                start: (new Date(currDate.toISOString())).getTime(),
+                end: (new Date(endDateTime.toISOString())).getTime()
+            };
+
             //if time is between a meeting, set timetable[time] to 1 (busy)
             //TODO: check inequality signs/logic
-            if((((new Date(meetings[x].start_datetime)).getTime() <= (new Date(currDate.toISOString())).getTime()) && 
-                ((new Date(meetings[x].end_datetime)).getTime() > (new Date(currDate.toISOString())).getTime())) ||
-               (((new Date(meetings[x].start_datetime)).getTime() <= (new Date(endDateTime.toISOString())).getTime()) && 
-                ((new Date(meetings[x].end_datetime)).getTime() >= (new Date(endDateTime.toISOString())).getTime()))) {
-              //timetable[timetable.length - 1].available = 1;
+            if(checkMeetingIntersect(meetingObj, timeSlotObj)) {
                 timeslot.available = 1;
             }
             x++;
@@ -898,13 +909,17 @@ const createRoomSuggestions = function(userTimes, roomMeetings) {
                 timeSlot.rooms.push(roomName);
                 for(var i = 0; i < meetingTimes.length - 1; i+=2) {
 
-                    var startTime = meetingTimes[i];
-                    var endTime = meetingTimes[i+1];
+                    var meetingObj = {
+                        start: (new Date(meetingTimes[i])).getTime(),
+                        end: (new Date(meetingTimes[i+1])).getTime()
+                    };
 
-                    if((((new Date(timeSlot.startDateTime)).getTime() <= (new Date(startTime)).getTime()) && 
-                    ((new Date(timeSlot.endDateTime)).getTime() > (new Date(startTime)).getTime())) ||
-                   (((new Date(timeSlot.startDateTime)).getTime() <= (new Date(endTime)).getTime()) && 
-                    ((new Date(timeSlot.endDateTime)).getTime() >= (new Date(endTime)).getTime()))) {
+                    var timeSlotObj = {
+                        start: (new Date(timeSlot.startDateTime)).getTime(),
+                        end: (new Date(timeSlot.endDateTime)).getTime()
+                    };
+
+                    if(checkMeetingIntersect(meetingObj, timeSlotObj)) {
                         timeSlot.rooms.pop();
                         break;
                     }
@@ -917,6 +932,23 @@ const createRoomSuggestions = function(userTimes, roomMeetings) {
         resolve(userTimes);
     });
 
+};
+
+const checkMeetingIntersect = function(meetingObj, timeSlotObj) {
+    var meetingStart = (new Date(meetingObj.start)).getTime();
+    var meetingEnd =(new Date(meetingObj.end)).getTime();
+    var timeSlotStart = (new Date(timeSlotObj.start)).getTime();
+    var timeSlotEnd = (new Date(timeSlotObj.end)).getTime();
+
+    if((meetingStart >= timeSlotStart && meetingStart < timeSlotEnd) 
+    || (meetingEnd > timeSlotStart && meetingEnd <= timeSlotEnd) 
+    || (meetingStart <= timeSlotStart && meetingEnd >= timeSlotEnd)) {
+
+        return true;
+    }
+    else {
+        return false;
+    }
 };
 
 const getSuggestions = function(userTimes) {
