@@ -2,6 +2,25 @@
 var app = angular.module("CalendarApp", []);
 
 app.controller('CalendarCtrl', function($scope, $http){
+	$scope.events = [];
+
+	$scope.createCalendar = function() {
+		console.log("create calendar")
+		$scope.calendar = $('#calendar').fullCalendar({
+		  header: {
+		    left: 'prev,next today',
+		    center: 'title',
+		    right: 'month,basicWeek,basicDay'
+		  },
+		  defaultDate: Date(),
+		  navLinks: true, // can click day/week names to navigate views
+		  editable: true,
+		  eventLimit: true, // allow "more" link when too many events
+		  events: $scope.events
+		});
+		$('#calendar').fullCalendar( 'addEventSource', $scope.events );
+	}
+
 	//set the query to empty to start
 	$scope.searchQuery = "";
 
@@ -31,43 +50,12 @@ app.controller('CalendarCtrl', function($scope, $http){
 						}
 						$scope.events.push(temp);
 					}
-					loadCalendar($scope.events);
+
+					$scope.createCalendar();
+
 				}); //end of meetings function	
 			}
 		});
 	}; //end of search function
+
 }); //end of angular app
-
-function loadCalendar(myEvents) {
-	console.log("Function was called");
-	console.log(myEvents);
-	$('#calendar').fullCalendar({
-	  header: {
-	    left: 'prev,next today',
-	    center: 'title',
-	    right: 'month,basicWeek,basicDay'
-	  },
-	  defaultDate: Date(),
-	  navLinks: true, // can click day/week names to navigate views
-	  editable: true,
-	  eventLimit: true, // allow "more" link when too many events
-	  events: myEvents
-	});
-	$('#calendar').reload(true);
-};
-
-$(document).ready(function() {
-	console.log("Ran main calendar function");
-	$('#calendar').fullCalendar({
-	  header: {
-	    left: 'prev,next today',
-	    center: 'title',
-	    right: 'month,basicWeek,basicDay'
-	  },
-	  defaultDate: Date(),
-	  navLinks: true, // can click day/week names to navigate views
-	  editable: true,
-	  eventLimit: true, // allow "more" link when too many events
-	  events: []
-	});
-});
