@@ -725,15 +725,15 @@ exports.meetingSuggestion = function(obj) {
     }   
     getRoomMeetingsSql += "GROUP BY room_name;";
 
-    console.log(getRoomMeetingsSql);
+    //console.log(getRoomMeetingsSql);
     var getOtherRoomsSql = "SELECT DISTINCT MR.name FROM ebdb.MeetingRoom AS MR, ebdb.RoomResourceMeetingRoomAssociation AS A, ebdb.RoomResource AS RR "
                            + "WHERE MR.name NOT IN (SELECT DISTINCT room_name FROM ebdb.Meeting "
                            + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4))";
-    if(oresources.length != 0) {
+    if(resources.length != 0) {
         getOtherRoomsSql += " AND MR.id = A.room AND A.resource = RR.id and RR.name IN (?)";
     }
     getOtherRoomsSql += ";";
-    console.log(getOtherRoomsSql);
+    //console.log(getOtherRoomsSql);
     var getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.Meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.User WHERE email IN (?)) ORDER BY end_datetime;";
 
@@ -972,8 +972,30 @@ const checkMeetingIntersect = function(meetingObj, timeSlotObj) {
 
 const getSuggestions = function(userTimes, duration) {
     return new Promise(function(resolve, reject) {
+        // const days = duration.match(/\d+D/g);
+        // const hours = duration.match(/\d+H/g);
+        // const mins = duration.match(/\d+M/g);
+
+        // let obj = {};
+
+        // if(hours) {
+        //     obj.hours = parseInt(String(hours).slice(0, -1));
+        // }
+
+        // if(mins) {
+        //     obj.minutes = parseInt(String(mins).slice(0, -1));
+        // }
+
+        // if(days || obj.hours > 4) {
+        //     obj.hours = 4;
+        //     obj.hours = 0;
+        // }
+
+        // var slotsToCount = obj.hours*2 + obj.minutes/30;
+
         let countTimes = 0;
         let suggestions = [];
+        //let currentSlotCount = 0;
         //iterate through timetable and find first 5 suggestions
         for(var i = 0; i < userTimes.length; i++) {
             var timeSlot = userTimes[i];
