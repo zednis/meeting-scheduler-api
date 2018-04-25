@@ -330,6 +330,10 @@ exports.getRooms = function(parameters) {
     const joins = [];
     const constraints = [];
 
+    if(parameters.hasOwnProperty("nameContains")) {
+        constraints.push("LOWER(MR.name) like "+ db.pool.escape("%"+parameters.nameContains.toLowerCase()+"%"))
+    }
+
     if(parameters.hasOwnProperty("resources")) {
         joins.push("JOIN ebdb.RoomResourceMeetingRoomAssociation RRMRA  on RRMRA.room = MR.id");
         joins.push("JOIN ebdb.RoomResource RR on RRMRA.resource = RR.id");
