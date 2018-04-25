@@ -7,16 +7,16 @@ app.controller('CalendarCtrl', function($scope, $http){
 	$scope.createCalendar = function() {
 		console.log("create calendar")
 		$scope.calendar = $('#calendar').fullCalendar({
-		  header: {
-		    left: 'prev,next today',
-		    center: 'title',
-		    right: 'month,basicWeek,basicDay'
-		  },
-		  defaultDate: Date(),
-		  navLinks: true, // can click day/week names to navigate views
-		  editable: true,
-		  eventLimit: true, // allow "more" link when too many events
-		  events: $scope.events
+		  	header: {
+		    	left: 'prev,next today',
+		    	center: 'title',
+		    	right: 'month,agendaWeek,agendaDay,listWeek'
+		 	 },
+			  defaultDate: Date(),
+			  navLinks: true, // can click day/week names to navigate views
+			  editable: false,
+			  eventLimit: true, // allow "more" link when too many events
+			  events: $scope.events
 		});
 		$('#calendar').fullCalendar( 'addEventSource', $scope.events );
 	}
@@ -34,24 +34,32 @@ app.controller('CalendarCtrl', function($scope, $http){
 
 		$http.get(url, {params:query}).then(function(response){
 			console.log(response);
-			if(response.status ==200){
+			if (response.data.items.length==0) {
+				alert('Invalid user email, please try again.');
+			}
+			else {
 				$scope.userID = response.data.items[0].userId;
 				url = url + "/" + $scope.userID + '/meetings';
 
 				$http.get(url, {params:$scope.userID}).then(function(response){
-					var meetings = response.data.meetings;
-					//Parse meetings array and form events array that will be used in the calendar interface
-					$scope.events = []
-					for (i=0; i < meetings.length; i++){
-						temp = {
-							title: meetings[i].name,
-							start: meetings[i].startDateTime,
-							end: meetings[i].endDateTime
-						}
-						$scope.events.push(temp);
+					if (response.data.meetings.length ==0){
+						alert('This user currently has no events');
 					}
+					else {
+						var meetings = response.data.meetings;
+						//Parse meetings array and form events array that will be used in the calendar interface
+						$scope.events = []
+						for (i=0; i < meetings.length; i++){
+							temp = {
+								title: meetings[i].name,
+								start: meetings[i].startDateTime,
+								end: meetings[i].endDateTime
+							}
+							$scope.events.push(temp);
+						}
 
-					$scope.createCalendar();
+						$scope.createCalendar();
+					}
 
 				}); //end of meetings function	
 			}
