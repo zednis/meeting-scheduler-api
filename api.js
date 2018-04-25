@@ -715,7 +715,7 @@ exports.meetingSuggestion = function(obj) {
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
     var getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
                       + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) ";
-    if(obj.resources.length != 0) {
+    if(resources.length != 0) {
         getRoomMeetingsSql += "AND room_name IN (SELECT MR.name FROM ebdb.meetingroom AS MR, ebdb.roomresourcemeetingroomassociation AS A, ebdb.roomresource AS RR "
                             + "WHERE MR.id = A.room AND A.resource = RR.id and RR.name IN (?)) ";
     }   
@@ -725,7 +725,7 @@ exports.meetingSuggestion = function(obj) {
     var getOtherRoomsSql = "SELECT DISTINCT MR.name FROM ebdb.meetingroom AS MR, ebdb.roomresourcemeetingroomassociation AS A, ebdb.roomresource AS RR "
                            + "WHERE MR.name NOT IN (SELECT DISTINCT room_name FROM ebdb.meeting "
                            + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4))";
-    if(obj.resources.length != 0) {
+    if(oresources.length != 0) {
         getOtherRoomsSql += " AND MR.id = A.room AND A.resource = RR.id and RR.name IN (?)";
     }
     getOtherRoomsSql += ";";
