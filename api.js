@@ -709,26 +709,41 @@ exports.deleteUser = function (userId) {
 exports.meetingSuggestion = function(obj) {
 
     var participants = obj.participants || [];
+    var resources = obj.resources || [];
+    var duration = obj.duration || "1H";
 
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
-    const getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
-                      + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) GROUP BY room_name;";
-    const getOtherRoomsSql = "SELECT name FROM ebdb.meetingroom WHERE name NOT  IN (SELECT DISTINCT room_name FROM ebdb.meeting "
-                           + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4));"
-    const getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
+    var getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
+                      + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) ";
+    if(obj.resources.length != 0) {
+        getRoomMeetingsSql += "AND room_name IN (SELECT MR.name FROM ebdb.meetingroom AS MR, ebdb.roomresourcemeetingroomassociation AS A, ebdb.roomresource AS RR "
+                            + "WHERE MR.id = A.room AND A.resource = RR.id and RR.name IN (?)) ";
+    }   
+    getRoomMeetingsSql += "GROUP BY room_name;";
+
+    console.log(getRoomMeetingsSql);
+    var getOtherRoomsSql = "SELECT DISTINCT MR.name FROM ebdb.meetingroom AS MR, ebdb.roomresourcemeetingroomassociation AS A, ebdb.roomresource AS RR "
+                           + "WHERE MR.name NOT IN (SELECT DISTINCT room_name FROM ebdb.meeting "
+                           + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4))";
+    if(obj.resources.length != 0) {
+        getOtherRoomsSql += " AND MR.id = A.room AND A.resource = RR.id and RR.name IN (?)";
+    }
+    getOtherRoomsSql += ";";
+    console.log(getOtherRoomsSql);
+    var getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.user WHERE email IN (?)) ORDER BY end_datetime;";
 
     let connection;
     let roomMeetings;
     let otherRooms;
     return db.pool.getConnection()
-        .then(conn => { connection = conn; return conn.query(getRoomMeetingsSql)})
-        .then(results => { roomMeetings = results; return connection.query(getOtherRoomsSql)})
+        .then(conn => { connection = conn; return conn.query(getRoomMeetingsSql, [resources])})
+        .then(results => { roomMeetings = results; return connection.query(getOtherRoomsSql, [resources])})
         .then(results => { otherRooms = results; return connection.query(getMeetingSql, [participants])})
         .then(results => { return createTimetable(timetableFormatter(results, obj), otherRooms) })
         .then(timetable => { return getUserAvailableTimes(timetable)})
         .then(userTimes => { return createRoomSuggestions(userTimes, roomMeetings)})
-        .then(userTimes => { return getSuggestions(userTimes)})
+        .then(userTimes => { return getSuggestions(userTimes, duration)})
         .then(obj => { return finish(obj)})
         .catch(err => { return getError(err)})
         .finally(() => { if(connection) { connection.release(); }});
@@ -951,7 +966,7 @@ const checkMeetingIntersect = function(meetingObj, timeSlotObj) {
     }
 };
 
-const getSuggestions = function(userTimes) {
+const getSuggestions = function(userTimes, duration) {
     return new Promise(function(resolve, reject) {
         let countTimes = 0;
         let suggestions = [];

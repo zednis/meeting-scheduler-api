@@ -628,6 +628,12 @@ definitions:
         items:
           type: string
           description: participant email
+      resources:
+        description: list of resource names
+        type: array
+        items:
+          type: string
+          description: resource name
       startTime:
         type: number
         description: workday starting hour (0-23). default 7AM = 7
@@ -637,6 +643,9 @@ definitions:
       numDaysAhead:
         type: number
         description: number of days ahead to search. default 3
+      duration:
+        type: string
+        description: meeting duration
     required:
       - participants
 
