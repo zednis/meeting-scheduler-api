@@ -972,30 +972,36 @@ const checkMeetingIntersect = function(meetingObj, timeSlotObj) {
 
 const getSuggestions = function(userTimes, duration) {
     return new Promise(function(resolve, reject) {
-        // const days = duration.match(/\d+D/g);
-        // const hours = duration.match(/\d+H/g);
-        // const mins = duration.match(/\d+M/g);
+        //parse duration
+        const days = duration.match(/\d+D/g) || "0D";
+        const hours = duration.match(/\d+H/g) || "0H";
+        const mins = duration.match(/\d+M/g) || "0M";
 
-        // let obj = {};
+        let obj = {};
 
-        // if(hours) {
-        //     obj.hours = parseInt(String(hours).slice(0, -1));
-        // }
+        if(hours) {
+            obj.hours = parseInt(String(hours).slice(0, -1));
+        }
 
-        // if(mins) {
-        //     obj.minutes = parseInt(String(mins).slice(0, -1));
-        // }
+        if(mins) {
+            obj.minutes = parseInt(String(mins).slice(0, -1));
+        }
 
-        // if(days || obj.hours > 4) {
-        //     obj.hours = 4;
-        //     obj.hours = 0;
-        // }
+        if(days > 0 || obj.hours >= 4) {
+            obj.hours = 4;
+            obj.minutes = 0;
+        }
 
-        // var slotsToCount = obj.hours*2 + obj.minutes/30;
+        console.log(obj);
 
-        let countTimes = 0;
-        let suggestions = [];
-        //let currentSlotCount = 0;
+        //number of consecutive timeslots needed
+        var slotsToCount = obj.hours * 2 + Math.ceil(obj.minutes / 30); 
+        console.log(slotsToCount);
+
+        let countTimes = 0; //number of suggestions
+        let suggestions = []; //list of timeslot objects
+        let currentSlotCount = 0; //counter for number of consecutive timeslots
+
         //iterate through timetable and find first 5 suggestions
         for(var i = 0; i < userTimes.length; i++) {
             var timeSlot = userTimes[i];
@@ -1003,9 +1009,45 @@ const getSuggestions = function(userTimes, duration) {
                 break;
             }
             if((timeSlot.rooms).length != 0) {
-                countTimes++;
-                delete timeSlot.available;
-                suggestions.push(timeSlot);
+                var timeSlotStart = timeSlot.startDateTime;
+                currentSlotCount = 1;
+                var roomSugg = timeSlot.rooms;
+                //console.log(roomSugg);
+                //need to find consecutive timeslots open
+                for(var j = i+1; j < userTimes.length; j++) {
+                    var previousEndTime = new Date(userTimes[j-1].endDateTime).getTime();
+                    var currentStartTime = new Date(userTimes[j].startDateTime).getTime();
+
+                    //if we have a suggestion with rooms that is in succession of the prev time
+                    if(userTimes[j].rooms.length != 0 && previousEndTime == currentStartTime) {
+                        //take the intersection of the rooms
+                        roomSugg = roomSugg.filter(function(n) {
+                            return (userTimes[j].rooms).indexOf(n) > -1;
+                        });
+                        //console.log(roomSugg);
+                        //if the resulting intersect is empty, stop
+                        if(roomSugg.length == 0) {
+                            break;
+                        }
+                        currentSlotCount++;
+                        //if we reached our goal, add it to the list
+                        if(currentSlotCount == slotsToCount) {
+                            countTimes++;
+                            var suggestion = {
+                                startDateTime: timeSlotStart,
+                                endDateTime: userTimes[j].endDateTime,
+                                rooms: roomSugg
+                            };
+                            suggestions.push(suggestion);
+                            break;
+                        }
+                    }
+                    else {
+                        break;
+                    }
+                        
+                }
+                currentSlotCount = 0;
             }
         }
         resolve(suggestions);
