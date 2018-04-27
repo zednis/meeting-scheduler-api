@@ -782,7 +782,7 @@ const createTimetable = function(obj, otherRooms) {
 
         //if weekend, or friday after endTime, start searching monday at startTime
         if(currDate.getDay() == 6 || currDate.getDay == 0 ||
-           (currDate.getDay() == 5 && currDate.getHour() >= endTime)) {
+           (currDate.getDay() == 5 && currDate.getHours() >= endTime)) {
           if(currDate.getDay() == 6) {
             currDate.setDate(currDate.getDate() + 2);
           }
