@@ -645,7 +645,8 @@ definitions:
         description: number of days ahead to search. default 3
       duration:
         type: string
-        description: meeting duration
+        description: meeting duration. default "1H"
+        format: duration
     required:
       - participants
 
