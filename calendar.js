@@ -25,7 +25,7 @@ app.controller('CalendarCtrl', function($scope, $http){
 	$scope.searchQuery = "";
 
 	$scope.newSearch = function(){
-		var url = '/api/users';
+		var url = 'http://meeting-scheduler.us-east-1.elasticbeanstalk.com/api/users';
 
 		//load the variable to hold the contents of the query
 		var query = {
