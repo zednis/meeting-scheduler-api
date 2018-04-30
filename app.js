@@ -189,6 +189,12 @@ function get(req, res, apicall, parameter) {
         timestamp: new Date()
     };
 
+    // 'Access-Control-Allow-Origin': '*',
+    // 'Access-Control-Allow-Methods': 'GET'
+    
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET');
+    
     apicall(parameter)
         .then(function(result) {
             if(result.status === "OK") {
