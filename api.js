@@ -150,12 +150,12 @@ exports.createMeeting = function(meeting) {
                         // TODO what if roomName is null?
 
                         console.log(db.formatQuery(getRoomSQL, [meeting.room]));
-                        conn.query(getRoomSQL, [meeting.room])
+                        conn.query(getRoomSQL, [meeting.room]) //check if room exists
                             .then(results => {
                                 if(results.length === 0) {
                                     reject({status: "FAILURE", error: "meeting room not found"})
                                 } else {
-                                    conn.query(getUsersByEmailSql, [organizerEmail])
+                                    conn.query(getUsersByEmailSql, [organizerEmail]) //get all participants
                                         .then(results => {
                                             if(results.length === 0) {
                                                 reject({status: "FAILURE", error: "organizer not found"})
@@ -228,10 +228,11 @@ exports.updateMeeting = function(obj) {
     let setAlreadyFlag = false; //becomes true if one of the fields has been set
     const sqlInserts = {
         name: obj.body.name || null,
-        startDateTime: db.formatDatetime(obj.body.startDateTime) || null,
-        endDateTime: db.formatDatetime(obj.body.endDateTime) || null
+        start_datetime: db.formatDatetime(obj.body.startDateTime) || null,
+        end_datetime: db.formatDatetime(obj.body.endDateTime) || null
     };
 
+    //construct UPDATE query
     for (const key in sqlInserts) {
         if (sqlInserts.hasOwnProperty(key)) {
             sql += (setAlreadyFlag) ? ", " : " SET ";
@@ -618,6 +619,7 @@ exports.createUser = function (request) {
         calendarName: request.givenName + "'s Meeting Room Calendar" || null
     };
 
+    //create user's calendar, then create the user
     const calendarName = user.email + "'s Calendar" || "";
     const calendarSql = "INSERT INTO ebdb.Calendar (name) VALUES (?);";
     const userSql = "INSERT INTO ebdb.User (email, given_name, family_name, primary_calendar) VALUES (?, ?, ?, ?);";
@@ -681,7 +683,7 @@ exports.updateUser = function(obj) {
 };
 
 exports.deleteUser = function (userId) {
-
+    //delete calendar then delete user
     const deleteCalendarSql = "DELETE FROM ebdb.Calendar WHERE id in (SELECT primary_calendar from ebdb.User WHERE id = " + db.pool.escape(userId) + ")";
     const deleteUserSql = "DELETE FROM ebdb.User WHERE id = " + db.pool.escape(userId);
 
@@ -719,13 +721,13 @@ exports.meetingSuggestion = function(obj) {
     //using ADDDATE(CURDATE(), 4) just to limit the amount of meetings to search through later
     var getRoomMeetingsSql = "SELECT room_name, GROUP_CONCAT(DISTINCT start_datetime, '|', end_datetime SEPARATOR '|') AS meetingTimes FROM ebdb.Meeting "
                       + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) ";
-    if(resources.length != 0) {
+    if(resources.length != 0) { //only filter more if employee asks for a room with resources
         getRoomMeetingsSql += "AND room_name IN (SELECT MR.name FROM ebdb.MeetingRoom AS MR, ebdb.RoomResourceMeetingRoomAssociation AS A, ebdb.RoomResource AS RR "
                             + "WHERE MR.id = A.room AND A.resource = RR.id and RR.name IN (?)) ";
     }   
     getRoomMeetingsSql += "GROUP BY room_name;";
 
-    //console.log(getRoomMeetingsSql);
+    //rooms without any meetings will be included
     var getOtherRoomsSql = "SELECT DISTINCT MR.name FROM ebdb.MeetingRoom AS MR, ebdb.RoomResourceMeetingRoomAssociation AS A, ebdb.RoomResource AS RR "
                            + "WHERE MR.name NOT IN (SELECT DISTINCT room_name FROM ebdb.Meeting "
                            + "WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4))";
@@ -733,7 +735,8 @@ exports.meetingSuggestion = function(obj) {
         getOtherRoomsSql += " AND MR.id = A.room AND A.resource = RR.id and RR.name IN (?)";
     }
     getOtherRoomsSql += ";";
-    //console.log(getOtherRoomsSql);
+    
+    //get the meetings of all rooms between curdate() and the next 4 days
     var getMeetingSql = "SELECT DISTINCT start_datetime, end_datetime FROM ebdb.Meeting WHERE start_datetime >= CURDATE() AND end_datetime <= ADDDATE(CURDATE(), 4) AND "
                         + "calendar IN (SELECT primary_calendar FROM ebdb.User WHERE email IN (?)) ORDER BY end_datetime;";
 
@@ -762,7 +765,7 @@ const timetableFormatter = function(results, obj) {
     }
 };
 
-
+//create time interval data structure to use for checking availability
 const createTimetable = function(obj, otherRooms) {
     return new Promise(function(resolve, reject) {
 
@@ -851,18 +854,15 @@ const createTimetable = function(obj, otherRooms) {
             otherRoomNames.push(otherRooms[t].name);
           }
 
-          //console.log(otherRoomNames);
-
           var timeslot = {
             startDateTime: currDate.toISOString(),
             endDateTime: endDateTime,
             rooms: otherRoomNames,
             available: 0
           };
-          //timetable.push(timeslot);
 
           var x = 0;
-          //iterate through all meetings. if we find a meeting that conflicts, set that to busy
+          //iterate through all meetings. if we find a meeting that conflicts, set that to busy (1)
           //if we don't, then the time is open/free
           while(x < meetings.length) {
 
@@ -876,8 +876,7 @@ const createTimetable = function(obj, otherRooms) {
                 end: (new Date(endDateTime.toISOString())).getTime()
             };
 
-            //if time is between a meeting, set timetable[time] to 1 (busy)
-            //TODO: check inequality signs/logic
+            //if time is between a meeting, set timeslot.avalable to 1 (busy)
             if(checkMeetingIntersect(meetingObj, timeSlotObj)) {
                 timeslot.available = 1;
             }
@@ -906,7 +905,7 @@ const createTimetable = function(obj, otherRooms) {
 const getUserAvailableTimes = function(timetable) {
     return new Promise(function(resolve, reject) {
         let times = [];
-        //iterate through timetable and find first 5 suggestions
+        //iterate through timetable and find all available timeslots
         for(var i = 0; i < timetable.length; i++) {
             if(timetable[i].available == 0) {
                 times.push(timetable[i]);
@@ -953,6 +952,8 @@ const createRoomSuggestions = function(userTimes, roomMeetings) {
 
 };
 
+//given a meeting obj (start/end datetime) and a timeSlot obj (start/end datetime)
+//return true if they overlap, else false
 const checkMeetingIntersect = function(meetingObj, timeSlotObj) {
     var meetingStart = (new Date(meetingObj.start)).getTime();
     var meetingEnd =(new Date(meetingObj.end)).getTime();
