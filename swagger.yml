@@ -60,8 +60,8 @@ paths:
           format: date-time
           required: false
         - in: query
-          name: roomName
-          description: room name
+          name: nameContains
+          description: room name search parameter
           type: string
           required: false
       tags:
@@ -628,6 +628,12 @@ definitions:
         items:
           type: string
           description: participant email
+      resources:
+        description: list of resource names
+        type: array
+        items:
+          type: string
+          description: resource name
       startTime:
         type: number
         description: workday starting hour (0-23). default 7AM = 7
@@ -637,6 +643,10 @@ definitions:
       numDaysAhead:
         type: number
         description: number of days ahead to search. default 3
+      duration:
+        type: string
+        description: meeting duration. default "1H"
+        format: duration
     required:
       - participants
 
@@ -653,11 +663,26 @@ definitions:
         type: string
         format: date-time
       suggestions:
-        description: a list of suggested meeting times
+        description: a list of suggested meeting times and rooms
         type: array
         items:
-          type: string
-          format: date-time
+          type: object
+          properties:
+            startDateTime:
+              type: string`
+              description: time slot start datetime
+              format: date-time
+            endDateTime:
+              type: string`
+              description: time slot end datetime
+              format: date-time
+            rooms:
+              type: array
+              description: list of room names available during that time slot
+              items:
+                type: string
+                description: room name
+
     required:
       - requestURL
       - action
