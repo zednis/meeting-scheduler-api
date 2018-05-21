@@ -1,0 +1,43 @@
+<!DOCTYPEhtmlPUBLIC"-//W3C//DTDXHTML1.1//EN"  
+"http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd"> 
+<html ng-app="CalendarApp">
+<head>
+<meta charset='utf-8' />
+<script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+<link href='../fullcalendar.min.css' rel='stylesheet' />
+<link href='../fullcalendar.print.min.css' rel='stylesheet' media='print' />
+<script src='../lib/moment.min.js'></script>
+<script src='../lib/jquery.min.js'></script>
+<script src='../fullcalendar.min.js'></script>
+<script src='../../calendar.js'></script>
+<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/css/bootstrap.min.css" integrity="sha384-/Y6pD6FV/Vv2HJnA6t+vslU6fwYXjCFtcEpHbNJ0lyAFsXTsjBbfaDjzALeQsN6M" crossorigin="anonymous">
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-beta/js/bootstrap.min.js" integrity="sha384-h0AbiXch4ZDo7tp9hKZ4TsHbi047NrKGLO3SEJAg45jXxnGIfYzk4Si90RDIqNm1" crossorigin="anonymous"></script>
+<style>
+
+  body {
+    margin: 40px 10px;
+    padding: 0;
+    font-family: "Lucida Grande",Helvetica,Arial,Verdana,sans-serif;
+    font-size: 16px;
+  }
+
+  #calendar {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+</style>
+</head>
+<body>
+  <div id='wrapper' ng-controller='CalendarCtrl'>
+    <div class="form-inline" style="margin: 40px 10px; width:100%;">
+
+      <div class="form-group">
+        <input type="text" class="form-control" ng-model="searchQuery" id="search" placeholder="Enter User Email">
+        <button class='btn bn-secondary' style="background-color: #7accbd; color: white;" id="submitButton" type="button" ng-click="newSearch()">Load</button>
+      </div>
+    </div>
+    <div style="width:100%;" id='calendar' ng-init="createCalendar()"></div>
+  </div>
+</body>
+</html>
