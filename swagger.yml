@@ -86,23 +86,23 @@ paths:
           schema:
             $ref: "#/definitions/MeetingRoomInfo"
 
-    patch:
-      summary: Update Meeting Room Record
-      parameters:
-        - $ref: "#/parameters/roomName"
-        - name: patch request
-          in: body
-          description: patch request
-          required: true
-          schema:
-            $ref: "#/definitions/PatchRequest"
-      tags:
-        - Rooms
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: "#/definitions/ActionResponse"
+#    patch:
+#      summary: Update Meeting Room Record
+#      parameters:
+#        - $ref: "#/parameters/roomName"
+#        - name: patch request
+#          in: body
+#          description: patch request
+#          required: true
+#          schema:
+#            $ref: "#/definitions/PatchRequest"
+#      tags:
+#        - Rooms
+#      responses:
+#        200:
+#          description: OK
+#          schema:
+#            $ref: "#/definitions/ActionResponse"
 
     put:
       summary: Replace Meeting Room Record
@@ -214,23 +214,23 @@ paths:
           schema:
             $ref: "#/definitions/UserInfo"
 
-    patch:
-      summary: Update User Record
-      parameters:
-        - $ref: "#/parameters/userId"
-        - name: patch request
-          in: body
-          description: patch request
-          required: true
-          schema:
-            $ref: "#/definitions/PatchRequest"
-      tags:
-        - Users
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: "#/definitions/ActionResponse"
+#    patch:
+#      summary: Update User Record
+#      parameters:
+#        - $ref: "#/parameters/userId"
+#        - name: patch request
+#          in: body
+#          description: patch request
+#          required: true
+#          schema:
+#            $ref: "#/definitions/PatchRequest"
+#      tags:
+#        - Users
+#      responses:
+#        200:
+#          description: OK
+#          schema:
+#            $ref: "#/definitions/ActionResponse"
 
     put:
       summary: Replace User Record
@@ -314,23 +314,23 @@ paths:
           schema:
             $ref: "#/definitions/MeetingInfo"
 
-    patch:
-      summary: Update Meeting Record
-      parameters:
-        - $ref: "#/parameters/meetingId"
-        - name: patch request
-          in: body
-          description: patch request
-          required: true
-          schema:
-            $ref: "#/definitions/PatchRequest"
-      tags:
-        - Meetings
-      responses:
-        200:
-          description: OK
-          schema:
-            $ref: "#/definitions/ActionResponse"
+#    patch:
+#      summary: Update Meeting Record
+#      parameters:
+#        - $ref: "#/parameters/meetingId"
+#        - name: patch request
+#          in: body
+#          description: patch request
+#          required: true
+#          schema:
+#            $ref: "#/definitions/PatchRequest"
+#      tags:
+#        - Meetings
+#      responses:
+#        200:
+#          description: OK
+#          schema:
+#            $ref: "#/definitions/ActionResponse"
 
     put:
       summary: Replace Meeting Record
@@ -407,30 +407,30 @@ parameters:
 
 definitions:
 
-  PatchRequest:
-    type: object
-    properties:
-      resource:
-        type: string
-      changes:
-        type: array
-        items:
-          type: object
-          properties:
-            op:
-              type: string
-              enum: ["add", "remove", "replace", "test", "copy", "move"]
-            path:
-              type: string
-            from:
-              type: string
-            value: {}
-          required:
-            - op
-            - path
-    required:
-    - resource
-    - changes
+#  PatchRequest:
+#    type: object
+#    properties:
+#      resource:
+#        type: string
+#      changes:
+#        type: array
+#        items:
+#          type: object
+#          properties:
+#            op:
+#              type: string
+#              enum: ["add", "remove", "replace", "test", "copy", "move"]
+#            path:
+#              type: string
+#            from:
+#              type: string
+#            value: {}
+#          required:
+#            - op
+#            - path
+#    required:
+#    - resource
+#    - changes
 
   CreateMeetingRoomRequest:
     type: object
